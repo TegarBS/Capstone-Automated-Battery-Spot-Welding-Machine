@@ -21,3 +21,6 @@ __pycache__/
 venv/
 env/
 .pytest_cache/
+
+.tmp.driveupload
+.tmp.drivedownload

@@ -4,6 +4,12 @@
 // =========================================================
 // TASK KOMUNIKASI (PARSER MODBUS RTU)
 // =========================================================
+#include "Communication.h"
+#include "GlobalData.h"
+
+// =========================================================
+// TASK KOMUNIKASI (PARSER MODBUS RTU ZERO-QUEUE)
+// =========================================================
 void Task_Komunikasi(void *pvParameters) {
     while(1) {
         if (xSemaphoreTake(Sem_DataDiterima, portMAX_DELAY) == pdTRUE) {
@@ -21,94 +27,105 @@ void Task_Komunikasi(void *pvParameters) {
 
             uint8_t function_code = rxBuffer[1];
 
+            // -----------------------------------------------------
+            // FUNC 0x04: READ INPUT REGISTERS (Monitor Posisi X & Y)
+            // -----------------------------------------------------
             if (function_code == 0x04) {
-				uint16_t start_addr = (rxBuffer[2] << 8) | rxBuffer[3];
-				uint16_t quantity   = (rxBuffer[4] << 8) | rxBuffer[5];
+                uint16_t start_addr = (rxBuffer[2] << 8) | rxBuffer[3];
+                uint16_t quantity   = (rxBuffer[4] << 8) | rxBuffer[5];
 
-				// Validasi agar HMI tidak membaca di luar batas array (maks 10)
-				if (start_addr + quantity <= 10) {
-					uint8_t txBuffer[32];
-					uint8_t byte_count = quantity * 2;
+                if (start_addr + quantity <= 10) {
+                    uint8_t txBuffer[32];
+                    uint8_t byte_count = quantity * 2;
 
-					txBuffer[0] = 0x01;         // Slave ID
-					txBuffer[1] = 0x04;         // Function Code
-					txBuffer[2] = byte_count;   // Jumlah Byte Data
+                    txBuffer[0] = 0x01;
+                    txBuffer[1] = 0x04;
+                    txBuffer[2] = byte_count;
 
-					// Masukkan data 16-bit ke dalam frame 8-bit (High Byte lalu Low Byte)
-					for (uint16_t i = 0; i < quantity; i++) {
-						txBuffer[3 + (i * 2)] = (Input_Registers[start_addr + i] >> 8) & 0xFF;
-						txBuffer[4 + (i * 2)] = Input_Registers[start_addr + i] & 0xFF;
-					}
+                    for (uint16_t i = 0; i < quantity; i++) {
+                        txBuffer[3 + (i * 2)] = (Input_Registers[start_addr + i] >> 8) & 0xFF;
+                        txBuffer[4 + (i * 2)] = Input_Registers[start_addr + i] & 0xFF;
+                    }
 
-					// Hitung CRC16 untuk paket balasan
-					uint16_t crc_tx = Hitung_CRC16(txBuffer, 3 + byte_count);
-					txBuffer[3 + byte_count] = crc_tx & 0xFF;        // CRC Low Byte
-					txBuffer[4 + byte_count] = (crc_tx >> 8) & 0xFF; // CRC High Byte
+                    uint16_t crc_tx = Hitung_CRC16(txBuffer, 3 + byte_count);
+                    txBuffer[3 + byte_count] = crc_tx & 0xFF;
+                    txBuffer[4 + byte_count] = (crc_tx >> 8) & 0xFF;
 
-					// Kirim balasan ke HMI
-					HAL_UART_Transmit(&huart1, txBuffer, 5 + byte_count, 100);
-				}
-			}
+                    HAL_UART_Transmit(&huart1, txBuffer, 5 + byte_count, 100);
+                }
+            }
 
+            // -----------------------------------------------------
+            // FUNC 0x05: WRITE SINGLE COIL (Tombol Aksi HMI)
+            // -----------------------------------------------------
             else if (function_code == 0x05) {
                 uint16_t coil_addr = (rxBuffer[2] << 8) | rxBuffer[3];
                 uint16_t coil_val  = (rxBuffer[4] << 8) | rxBuffer[5];
 
-                // Jika HMI kirim Coil 00001 (0x0000) bernilai ON (0xFF00)
+                // COIL 0: START AUTO WELD
                 if (coil_addr == 0x0000 && coil_val == 0xFF00) {
-                    Koordinat_t titikBaru;
-
-                    // Rangkai X (Reg 0 & 1) dan Y (Reg 2 & 3) dari Holding Registers
-                    titikBaru.x = ((long)Holding_Registers[1] << 16) | Holding_Registers[0];
-                    titikBaru.y = ((long)Holding_Registers[3] << 16) | Holding_Registers[2];
-
-                    // Masukkan titik utuh tersebut ke Queue
-                    xQueueSend(Queue_Koordinat, &titikBaru, 0);
-                }else if (coil_addr == 0x0001 && coil_val == 0xFF00) {
-                    isAborted = true; // Aktifkan bendera rem darurat!
-                    isPaused = false; // Batalkan jeda jika sedang di-jeda
-                }else if (coil_addr == 0x0002 && coil_val == 0xFF00) {
-                	flagHoming = true;
-                    Koordinat_t cmdHome = {-999999, -999999}; // Kode khusus Homing
-                    xQueueSend(Queue_Koordinat, &cmdHome, 0);
-                }else if (coil_addr == 0x0003) {
+                    indexKolomAktual = 0; // Reset memori pola
+                    indexBarisAktual = 0;
+                    isAutoWeldActive = true; // Nyalakan mesin!
+                }
+                // COIL 1: ABORT / EMERGENCY STOP
+                else if (coil_addr == 0x0001 && coil_val == 0xFF00) {
+                    isAborted = true;
+                    isPaused = false;
+                }
+                // COIL 2: REQUEST HOMING
+                else if (coil_addr == 0x0002 && coil_val == 0xFF00) {
+                    flagMintaHoming = true;
+                }
+                // COIL 3: PAUSE & RESUME
+                else if (coil_addr == 0x0003) {
                     if (coil_val == 0xFF00) isPaused = true;  // ON = Jeda
                     else isPaused = false;                    // OFF = Lanjut
                 }
 
-                // Echo balik ke Master (HMI)
+                // Echo balik ke Master (HMI) tanda sukses
                 HAL_UART_Transmit(&huart1, rxBuffer, len, 100);
             }
 
+            // -----------------------------------------------------
+            // FUNC 0x06: WRITE SINGLE REGISTER (Setting Mesin)
+            // -----------------------------------------------------
             else if (function_code == 0x06) {
-				uint16_t alamat_offset = (rxBuffer[2] << 8) | rxBuffer[3];
-				uint16_t data_baru     = (rxBuffer[4] << 8) | rxBuffer[5];
+                uint16_t alamat_offset = (rxBuffer[2] << 8) | rxBuffer[3];
+                uint16_t data_baru     = (rxBuffer[4] << 8) | rxBuffer[5];
 
-				if (alamat_offset < 10) {
-					Holding_Registers[alamat_offset] = data_baru;
-				}
+                if (alamat_offset < 10) {
+                    Holding_Registers[alamat_offset] = data_baru;
 
-				// Echo balik ke Master (HMI) sesuai standar Modbus
-				HAL_UART_Transmit(&huart1, rxBuffer, len, 100);
-			}
+                    // MENGISI "OTAK" MESIN (Sinkronisasi ke configLas)
+                    // HMI harus mengirim data pitch dikali 10 (contoh: 18.5mm jadi 185)
+                    if (alamat_offset == 0) configLas.totalKolom = data_baru;
+                    if (alamat_offset == 1) configLas.totalBaris = data_baru;
+                    if (alamat_offset == 2) configLas.pitchX = (float)data_baru / 10.0f;
+                    if (alamat_offset == 3) configLas.pitchY = (float)data_baru / 10.0f;
 
+                    // Catatan: Reg 4 (Drop Delay) dan Reg 5 (Weld Time) biarkan
+                    // tersimpan di Holding_Registers karena dibaca langsung oleh Sequencer
+                }
+
+                HAL_UART_Transmit(&huart1, rxBuffer, len, 100);
+            }
+
+            // -----------------------------------------------------
+            // ILLEGAL FUNCTION / EXCEPTION
+            // -----------------------------------------------------
             else {
-				uint8_t txBuffer[5]; // Ukuran paket Exception selalu 5 Byte
+                uint8_t txBuffer[5];
+                txBuffer[0] = rxBuffer[0];
+                txBuffer[1] = function_code | 0x80;
+                txBuffer[2] = 0x01;
 
-				txBuffer[0] = rxBuffer[0];          // Slave ID (0x01)
-				txBuffer[1] = function_code | 0x80; // Function Code ditambah 0x80 (Penanda Error)
-				txBuffer[2] = 0x01;                 // Exception Code: 0x01 (Illegal Function)
+                uint16_t crc_tx = Hitung_CRC16(txBuffer, 3);
+                txBuffer[3] = crc_tx & 0xFF;
+                txBuffer[4] = (crc_tx >> 8) & 0xFF;
 
-				// Hitung CRC16 untuk 3 byte pertama
-				uint16_t crc_tx = Hitung_CRC16(txBuffer, 3);
-				txBuffer[3] = crc_tx & 0xFF;        // CRC Low Byte
-				txBuffer[4] = (crc_tx >> 8) & 0xFF; // CRC High Byte
-
-				// Tembakkan balasan error ke HMI
-				HAL_UART_Transmit(&huart1, txBuffer, 5, 100);
-			}
-
-
+                HAL_UART_Transmit(&huart1, txBuffer, 5, 100);
+            }
         }
     }
 }
