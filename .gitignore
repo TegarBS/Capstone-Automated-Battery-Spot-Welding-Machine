@@ -1,0 +1,23 @@
+# =========================
+# STM32CubeIDE (C/C++)
+# =========================
+Debug/
+Release/
+*.o
+*.elf
+*.bin
+*.hex
+*.map
+*.su
+.mxproject
+.settings/
+
+# =========================
+# Python (HMI GUI)
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.pytest_cache/
