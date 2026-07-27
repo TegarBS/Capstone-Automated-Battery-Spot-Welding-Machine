@@ -20,9 +20,10 @@ StepperMotor::StepperMotor(GPIO_TypeDef* step_port, uint16_t step_pin, GPIO_Type
     invertDir = false;
     state = IDLE_STATE;
 
-    // Konfigurasi Profil Akselerasi (Clock 4.000.000 Hz)
-    minARR = 192;    // Target Kecepatan Puncak: ~20.833 Hz
-    startARR = 2000; // Kecepatan Awal (Loncat zona getaran): ~2.000 Hz
+    // Inisialisasi Parameter Fisika
+	timerClock = 4000000;  // Pastikan sesuai dengan Prescaler di CubeMX
+	minFreq = 500.0f;      // Mulai dari 500 Hz (Sangat halus, bebas getar)
+	maxFreq = 20833.0f;    // Target kecepatan puncak (~20 kHz)
 }
 
 void StepperMotor::setTarget(long target) {
@@ -38,27 +39,25 @@ void StepperMotor::setTarget(long target) {
         HAL_GPIO_WritePin(dirPort, dirPin, invertDir ? GPIO_PIN_SET : GPIO_PIN_RESET);
     }
 
-    // 2. Kalkulasi Geometri Trapesium
-    accelSteps = 1736; // Jarak akselerasi ideal untuk mencapai 20kHz
-
-    // Jika jarak terlalu pendek, jadikan profil Segitiga
+    // 2. Kalkulasi Jarak Akselerasi
+    accelSteps = 1736;
     if (stepsToGo < (accelSteps * 2)) {
         accelSteps = stepsToGo / 2;
     }
+    if (accelSteps == 0) accelSteps = 1;
 
-    if (accelSteps == 0) accelSteps = 1; // Safety pembagian 0
+    // 3. HITUNG DELTA FREKUENSI (Bukan ARR)
+    // Contoh: (20833 - 500) / 1736 = Frekuensi akan naik ~11.7 Hz setiap 1x pulsa
+    freqDelta = (maxFreq - minFreq) / (float)accelSteps;
 
-    // Hitung kemiringan perubahan (Delta) ARR
-    arrDelta = (startARR - minARR) / accelSteps;
-    if (arrDelta == 0) arrDelta = 1; // Minimal berubah 1 angka
-
-    // 3. Mulai Pergerakan!
-    currentARR = startARR;
+    // 4. Mulai Pergerakan dari Frekuensi Terendah
+    currentFreq = minFreq;
     state = ACCELERATING;
     isMoving = true;
 
-    // Suntikkan nilai awal ke Hardware Timer lalu NYALAKAN Interupsi
-    __HAL_TIM_SET_AUTORELOAD(htim, currentARR);
+    // Kalkulasi nilai ARR perdana dan jalankan timer
+    uint32_t startARR = (uint32_t)(timerClock / currentFreq);
+    __HAL_TIM_SET_AUTORELOAD(htim, startARR);
     HAL_TIM_Base_Start_IT(htim);
 }
 
@@ -70,9 +69,9 @@ void StepperMotor::setInvertDirection(bool invert) {
 void StepperMotor::isr_update() {
     if (!isMoving) return;
 
-    // 1. Tembakkan Pulsa STEP (Hardware Level)
+    // 1. Tembakkan Pulsa STEP
     HAL_GPIO_WritePin(stepPort, stepPin, GPIO_PIN_SET);
-    for(volatile int i = 0; i < 15; i++) {} // Safety Delay sangat singkat untuk DRV8825
+    for(volatile int i = 0; i < 100; i++) {} // Delay aman ~5 microsecond
     HAL_GPIO_WritePin(stepPort, stepPin, GPIO_PIN_RESET);
 
     // 2. Update Koordinat
@@ -80,29 +79,35 @@ void StepperMotor::isr_update() {
     else currentPosition--;
     stepsToGo--;
 
-    // 3. MANIPULASI REGISTER FREKUENSI (ARR) DINAMIS
+    // 3. KALKULASI PROFIL KECEPATAN (BERDASARKAN FREKUENSI)
     if (stepsToGo == 0) {
-        // TARGET TERCAPAI: Matikan detak Timer agar CPU istirahat total!
+        // TARGET TERCAPAI
         HAL_TIM_Base_Stop_IT(htim);
         isMoving = false;
         state = IDLE_STATE;
+
+        // (Panggil Semaphore RTOS Anda di file MachineApp.cpp seperti sebelumnya)
+        return;
     }
     else if (stepsToGo <= accelSteps) {
-        // FASE DESELERASI: Perlambat frekuensi (Besarkan nilai ARR)
+        // FASE DESELERASI: Turunkan Frekuensi
         state = DECELERATING;
-        currentARR += arrDelta;
-        if (currentARR > startARR) currentARR = startARR;
-        __HAL_TIM_SET_AUTORELOAD(htim, currentARR);
+        currentFreq -= freqDelta;
+        if (currentFreq < minFreq) currentFreq = minFreq; // Safety limit
     }
     else if (state == ACCELERATING) {
-        // FASE AKSELERASI: Percepat frekuensi (Kecilkan nilai ARR)
-        currentARR -= arrDelta;
-        if (currentARR <= minARR) {
-            currentARR = minARR;
+        // FASE AKSELERASI: Naikkan Frekuensi
+        currentFreq += freqDelta;
+        if (currentFreq >= maxFreq) {
+            currentFreq = maxFreq;
             state = CRUISING;
         }
-        __HAL_TIM_SET_AUTORELOAD(htim, currentARR);
     }
+
+    // 4. Konversi Frekuensi Aktual menjadi nilai ARR untuk Timer
+    // Pembagian desimal ini dieksekusi sangat cepat berkat Hardware FPU STM32F4!
+    uint32_t nextARR = (uint32_t)(timerClock / currentFreq);
+    __HAL_TIM_SET_AUTORELOAD(htim, nextARR);
 }
 
 void StepperMotor::stop() {

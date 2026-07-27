@@ -28,10 +28,13 @@ private:
     long stepsToGo;
     long accelSteps;
 
-    uint32_t currentARR;    // Nilai ARR saat ini yang disuntikkan ke Timer
-    uint32_t minARR;        // ARR terkecil = Kecepatan Puncak (20.833 Hz)
-    uint32_t startARR;      // ARR terbesar = Kecepatan Awal/Berhenti (2.000 Hz)
-    uint32_t arrDelta;      // Nilai perubahan ARR setiap step
+    // Hapus variabel minARR, startARR, currentARR, arrDelta
+    // Ganti menjadi:
+    float minFreq;       // Frekuensi awal saat motor mulai bergerak (misal: 500 Hz)
+    float maxFreq;       // Frekuensi puncak / cruising (misal: 20000 Hz)
+    float currentFreq;   // Frekuensi aktual saat ini
+    float freqDelta;     // Lonjakan frekuensi per langkah
+    uint32_t timerClock; // Kecepatan clock timer (misal: 4000000)
 
 public:
     bool isMoving;
