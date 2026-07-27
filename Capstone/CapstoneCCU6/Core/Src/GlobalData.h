@@ -21,6 +21,9 @@ typedef struct {
     long y;
 } Koordinat_t;
 
+extern GPIO_PinState LIMIT_X_Pressed;
+extern GPIO_PinState LIMIT_Y_Pressed;
+
 // =========================================================
 // 2 [OBJEK & PERIPHERAL]
 // =========================================================
@@ -34,6 +37,7 @@ extern volatile bool isNavigating;
 extern volatile bool isPaused;
 extern volatile bool isAborted;
 extern volatile bool ignoreLimitSwitch;
+extern volatile bool flagHoming;
 
 // =========================================================
 // [RTOS HANDLES]

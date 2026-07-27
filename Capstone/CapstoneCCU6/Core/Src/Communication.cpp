@@ -68,6 +68,7 @@ void Task_Komunikasi(void *pvParameters) {
                     isAborted = true; // Aktifkan bendera rem darurat!
                     isPaused = false; // Batalkan jeda jika sedang di-jeda
                 }else if (coil_addr == 0x0002 && coil_val == 0xFF00) {
+                	flagHoming = true;
                     Koordinat_t cmdHome = {-999999, -999999}; // Kode khusus Homing
                     xQueueSend(Queue_Koordinat, &cmdHome, 0);
                 }else if (coil_addr == 0x0003) {

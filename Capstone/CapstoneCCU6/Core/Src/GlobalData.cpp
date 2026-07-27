@@ -10,7 +10,8 @@
 // =========================================================
 // 1 [STRUCT & KONSTANTA]
 // =========================================================
-
+GPIO_PinState LIMIT_X_Pressed = GPIO_PIN_SET;
+GPIO_PinState LIMIT_Y_Pressed = GPIO_PIN_SET;;
 
 // =========================================================
 // 2 [OBJEK & PERIPHERAL]
@@ -25,6 +26,7 @@ volatile bool isNavigating = false;
 volatile bool isPaused = false;
 volatile bool isAborted = false;
 volatile bool ignoreLimitSwitch = false;
+volatile bool flagHoming = false;
 
 // =========================================================
 // [RTOS HANDLES]

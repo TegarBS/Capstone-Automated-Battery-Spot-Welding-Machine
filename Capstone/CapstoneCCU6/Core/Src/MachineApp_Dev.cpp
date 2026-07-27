@@ -55,106 +55,112 @@ void Task_Sequencer(void *pvParameters) {
 
     while(1) {
 
-    	if (isAborted) {
-    		xQueueReset(Queue_Koordinat); // Buang sisa antrean titik las!
-    		isAborted = false;            // Reset bendera
-    		HAL_GPIO_WritePin(RELAY_Z_PORT, RELAY_Z_PIN, GPIO_PIN_RESET); // Naikkan pneumatik
-    		HAL_GPIO_WritePin(WELD_PORT, WELD_PIN, GPIO_PIN_RESET);       // Matikan trafo
-    	}
+        if (isAborted) {
+            xQueueReset(Queue_Koordinat); // Buang sisa antrean titik las!
+            isAborted = false;            // Reset bendera
+            HAL_GPIO_WritePin(RELAY_Z_PORT, RELAY_Z_PIN, GPIO_PIN_RESET); // Naikkan pneumatik
+            HAL_GPIO_WritePin(WELD_PORT, WELD_PIN, GPIO_PIN_RESET);       // Matikan trafo
+        }
 
-    	// 2. CEK PAUSE
-    	// Jika sedang pause, tidurkan Task ini tanpa memblokir sistem lain
-    	while (isPaused && !isAborted) {
-    		vTaskDelay(pdMS_TO_TICKS(50));
-    	}
+        // CEK PAUSE
+        while (isPaused && !isAborted) {
+            vTaskDelay(pdMS_TO_TICKS(50));
+        }
 
         // Ambil koordinat dari Queue (Tunggu maksimal 50ms per siklus)
         if (xQueueReceive(Queue_Koordinat, &target, pdMS_TO_TICKS(50)) == pdPASS) {
-        	// =========================================================
-			// DETEKSI PERINTAH HOMING (KODE -999999)
-			// =========================================================
-        	if (target.x == -999999 && target.y == -999999) {
 
-				// --- TAHAP 1: SEEK (Cari Limit Switch) ---
-				isNavigating = true;
-				motorX->setTarget(-999999);
-				motorY->setTarget(-999999);
+            // =========================================================
+            // DETEKSI PERINTAH HOMING DARI PC (KODE -999999)
+            // =========================================================
+            if (target.x == -999999 && target.y == -999999) {
 
-				// Tunggu sampai motor menabrak limit switch & berhenti oleh EXTI
-				xSemaphoreTake(SinyalPosisiTercapai, portMAX_DELAY);
+                // --- TAHAP 1: SEEK (Mencari Limit Switch dengan Pre-Flight Check) ---
+                isNavigating = true;
 
-				// Reset koordinat sementara agar kita bisa memberikan perintah maju
-				motorX->resetPosition();
-				motorY->resetPosition();
+                // Cek Sumbu X: Jika sudah tertekan dari awal, stop. Jika belum, mundur.
+                if (HAL_GPIO_ReadPin(LIMIT_X_GPIO_Port, LIMIT_X_Pin) == LIMIT_X_Pressed) {
+                    motorX->stop();
+                } else {
+                    motorX->setTarget(-999999);
+                }
 
+                // Cek Sumbu Y: Jika sudah tertekan dari awal, stop. Jika belum, mundur.
+                if (HAL_GPIO_ReadPin(LIMIT_Y_GPIO_Port, LIMIT_Y_Pin) == LIMIT_Y_Pressed) {
+                    motorY->stop();
+                } else {
+                    motorY->setTarget(-999999);
+                }
 
-				// --- TAHAP 2: PULL-OFF (Mundur untuk Melepas Sakelar) ---
-				// Matikan sementara respon limit switch agar aman dari getaran sakelar
-				ignoreLimitSwitch = true;
+                // Tunggu Semaphore HANYA JIKA ada motor yang benar-benar bergerak
+                if (motorX->isMoving || motorY->isMoving) {
+                    xSemaphoreTake(SinyalPosisiTercapai, portMAX_DELAY);
+                }
 
-				isNavigating = true;
-				// Mundur sejauh 200 step (Arah Positif)
-				// Catatan: Jika 200 step belum cukup untuk melepas bunyi 'klik' limit switch, naikkan angkanya (misal 500)
-				motorX->setTarget(3200);
-				motorY->setTarget(3200);
-
-				// Tunggu sampai motor selesai mundur
-				xSemaphoreTake(SinyalPosisiTercapai, portMAX_DELAY);
-
-				// Aktifkan kembali perlindungan Limit Switch
-				ignoreLimitSwitch = false;
+                // Reset koordinat sementara
+                motorX->resetPosition();
+                motorY->resetPosition();
 
 
-				// --- TAHAP 3: TETAPKAN ZERO ABSOLUT ---
-				// Titik setelah mundur ini adalah titik (0,0) yang asli dan aman!
-				motorX->resetPosition();
-				motorY->resetPosition();
+                // --- TAHAP 2: PULL-OFF (Maju sedikit agar sakelar terlepas) ---
+                ignoreLimitSwitch = true; // Matikan EXTI sementara agar aman dari getaran (bouncing)
+                isNavigating = true;
 
-				continue; // Selesai Homing, lanjut ke siklus antrean berikutnya
-			}
+                // Maju sejauh 3200 step (Sesuaikan angkanya jika dirasa kurang jauh)
+                motorX->setTarget(3200);
+                motorY->setTarget(3200);
 
-            // 1. SET TARGET MOTOR (Bergerak ke Titik Las)
+                // Tunggu sampai motor selesai maju
+                xSemaphoreTake(SinyalPosisiTercapai, portMAX_DELAY);
+
+                ignoreLimitSwitch = false; // Aktifkan kembali EXTI
+
+
+                // --- TAHAP 3: TETAPKAN ZERO ABSOLUT ---
+                // Titik setelah mundur ini adalah titik (0,0) yang asli dan aman!
+                motorX->resetPosition();
+                motorY->resetPosition();
+
+                continue; // Selesai Homing, lanjut baca antrean Queue berikutnya
+            }
+
+            // =========================================================
+            // SIKLUS NORMAL: BERGERAK KE TITIK LAS
+            // =========================================================
             isNavigating = true;
             motorX->setTarget(target.x);
             motorY->setTarget(target.y);
 
-            // 2. TUNGGU MOTOR SAMPAI DI TUJUAN
-            xSemaphoreTake(SinyalPosisiTercapai, portMAX_DELAY);
+            // Tunggu motor sampai di tujuan
+            if (motorX->isMoving || motorY->isMoving) {
+				// Jika ya, tunggu sampai Timer Hardware selesai dan memberi sinyal Semaphore
+				xSemaphoreTake(SinyalPosisiTercapai, portMAX_DELAY);
+			} else {
+				// Jika target koordinat SAMA dengan posisi saat ini (jarak = 0),
+				// motor tidak bergerak dan timer tidak menyala. Langsung matikan bendera navigasi.
+				isNavigating = false;
+			}
 
             // Jika dihentikan saat motor sedang bergerak, loncati proses las
-			if (isAborted) continue;
+            if (isAborted) continue;
 
-			// Cek lagi apakah operator menekan PAUSE persis saat motor sampai
-			while (isPaused && !isAborted) vTaskDelay(pdMS_TO_TICKS(50));
-			if (isAborted) continue;
+            // Cek lagi apakah operator menekan PAUSE persis saat motor sampai
+            while (isPaused && !isAborted) vTaskDelay(pdMS_TO_TICKS(50));
+            if (isAborted) continue;
 
-            // 3. PROSES PENGELASAN DENGAN PARAMETER DINAMIS MODBUS
-
-            // A. Turunkan Silinder Pneumatik Z
+            // --- PROSES PENGELASAN ---
             HAL_GPIO_WritePin(RELAY_Z_PORT, RELAY_Z_PIN, GPIO_PIN_SET);
+            vTaskDelay(pdMS_TO_TICKS(200));
 
-            // Baca waktu Drop Delay dari Holding Register 40005 (Beri default 200ms jika kosong)
-            uint16_t drop_delay = (Holding_Registers[4] > 0) ? Holding_Registers[4] : 200;
-            vTaskDelay(pdMS_TO_TICKS(drop_delay));
-
-            // B. Tembak Trafo Las
             HAL_GPIO_WritePin(WELD_PORT, WELD_PIN, GPIO_PIN_SET);
-
-            // Baca Durasi Las dari Holding Register 40006 (Beri default 30ms jika kosong)
-            uint16_t weld_time = (Holding_Registers[5] > 0) ? Holding_Registers[5] : 30;
-            vTaskDelay(pdMS_TO_TICKS(weld_time));
-
+            vTaskDelay(pdMS_TO_TICKS(30));
             HAL_GPIO_WritePin(WELD_PORT, WELD_PIN, GPIO_PIN_RESET);
 
-            // C. Angkat Kembali Silinder Z
             HAL_GPIO_WritePin(RELAY_Z_PORT, RELAY_Z_PIN, GPIO_PIN_RESET);
             vTaskDelay(pdMS_TO_TICKS(200));
 
-            // Catatan: Tidak perlu lagi HAL_UART_Transmit ACK di sini!
-            // Modbus sudah membalas saat paket diterima di Communication.cpp
-
         } else {
-            // --- AREA BEBAS BLOKING (Bisa dipakai untuk membaca tombol Manual Jogging) ---
+            // --- AREA BEBAS BLOKING (Manual Jogging dll) ---
         }
     }
 }
@@ -194,27 +200,42 @@ extern "C" void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 // --- CALLBACK INTERUPSI PIN (LIMIT SWITCH & E-STOP) ---
 extern "C" void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 
-    // (Opsional) Deteksi Emergency Stop (Tidak boleh mengabaikan limit switch)
-    // if (GPIO_Pin == ESTOP_Pin) {
-    //     motorX->stop(); motorY->stop();
-    //     // Matikan relay las / pneumatik
-    // }
+	// Abaikan interupsi jika mesin sedang dalam fase mundur (Pull-Off)
+	if (ignoreLimitSwitch) return;
 
-    // Abaikan interupsi jika mesin sedang dalam fase mundur (Pull-Off)
-    if (ignoreLimitSwitch) return;
+	bool isHit = false;
 
-    // 1. Deteksi Limit Switch Sumbu X
-    if (GPIO_Pin == LIMIT_X_Pin) {
-        if (motorX) motorX->stop();
-    }
+	// 1. Deteksi Limit Switch Sumbu X
+	if (GPIO_Pin == LIMIT_X_Pin) {
+		if (motorX) motorX->stop(); // Timer X mati instan
+		isHit = true;
+	}
 
-    // 2. Deteksi Limit Switch Sumbu Y
-    if (GPIO_Pin == LIMIT_Y_Pin) {
-        if (motorY) motorY->stop();
-    }
+	// 2. Deteksi Limit Switch Sumbu Y
+	if (GPIO_Pin == LIMIT_Y_Pin) {
+		if (motorY) motorY->stop(); // Timer Y mati instan
+		isHit = true;
+	}
 
+	// 3. SINKRONISASI ZERO-BLOCKING RTOS (PENYELAMAT DEADLOCK)
+	// Jika mesin sedang bergerak (Homing) dan menabrak switch
+	if (isNavigating && isHit) {
 
+		// PASTIKAN KEDUA MOTOR SUDAH BERHENTI
+		// Jika mesin homing diagonal, X mungkin nabrak duluan sementara Y masih jalan.
+		// Kita baru boleh membangunkan RTOS jika keduanya sudah benar-benar stop.
+		if (!motorX->isMoving && !motorY->isMoving) {
+
+			isNavigating = false; // Matikan bendera
+
+			// Berikan Semaphore untuk membangunkan Task_Sequencer!
+			BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+			xSemaphoreGiveFromISR(SinyalPosisiTercapai, &xHigherPriorityTaskWoken);
+			portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+		}
+	}
 }
+
 
 void Task_Monitor(void *pvParameters) {
     uint32_t counter_led = 0;
