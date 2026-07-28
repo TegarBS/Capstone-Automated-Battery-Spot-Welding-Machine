@@ -78,10 +78,14 @@ void Task_Komunikasi(void *pvParameters) {
                     flagMintaHoming = true;
                 }
                 // COIL 3: PAUSE & RESUME
-                else if (coil_addr == 0x0003) {
-                    if (coil_val == 0xFF00) isPaused = true;  // ON = Jeda
-                    else isPaused = false;                    // OFF = Lanjut
-                }
+				else if (coil_addr == 0x0003) {
+					if (coil_val == 0xFF00) isPaused = true;
+					else isPaused = false;
+				}
+				// [BARU] COIL 4: TRIGGER MODE MANUAL
+				else if (coil_addr == 0x0004 && coil_val == 0xFF00) {
+					flagManualWeld = true; // Bangunkan Sequencer untuk mode manual
+				}
 
                 // Echo balik ke Master (HMI) tanda sukses
                 HAL_UART_Transmit(&huart1, rxBuffer, len, 100);

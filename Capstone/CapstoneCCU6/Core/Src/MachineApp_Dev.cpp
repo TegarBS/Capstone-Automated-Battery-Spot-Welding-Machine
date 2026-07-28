@@ -162,12 +162,51 @@ void Task_Sequencer(void *pvParameters) {
 
             vTaskDelay(pdMS_TO_TICKS(10)); // Jeda CPU sebelum ke titik berikutnya
 
-        } else {
-            // =========================================================
-            // D. MODE STANDBY (Mesin nganggur menunggu perintah PC)
-            // =========================================================
-            vTaskDelay(pdMS_TO_TICKS(50));
-        }
+        } else if (flagManualWeld) {
+			// =========================================================
+			// D. MODE MANUAL (Single Jog & Weld)
+			// =========================================================
+
+			// 1. Ambil koordinat 32-bit dari Holding Register 6, 7 (X) dan 8, 9 (Y)
+			long targetManX = ((long)Holding_Registers[7] << 16) | Holding_Registers[6];
+			long targetManY = ((long)Holding_Registers[9] << 16) | Holding_Registers[8];
+
+			// 2. Bergerak ke Target
+			isNavigating = true;
+			motorX->setTarget(targetManX);
+			motorY->setTarget(targetManY);
+
+			// Cegah deadlock jika jarak = 0
+			if (motorX->isMoving || motorY->isMoving) {
+				xSemaphoreTake(SinyalPosisiTercapai, portMAX_DELAY);
+			} else {
+				isNavigating = false;
+			}
+
+			if (isAborted) {
+				flagManualWeld = false;
+				continue;
+			}
+
+			// 3. Proses Las Manual
+			HAL_GPIO_WritePin(RELAY_Z_PORT, RELAY_Z_PIN, GPIO_PIN_SET);
+			vTaskDelay(pdMS_TO_TICKS(200));
+
+			HAL_GPIO_WritePin(WELD_PORT, WELD_PIN, GPIO_PIN_SET);
+			vTaskDelay(pdMS_TO_TICKS(30));
+			HAL_GPIO_WritePin(WELD_PORT, WELD_PIN, GPIO_PIN_RESET);
+
+			HAL_GPIO_WritePin(RELAY_Z_PORT, RELAY_Z_PIN, GPIO_PIN_RESET);
+			vTaskDelay(pdMS_TO_TICKS(200));
+
+			flagManualWeld = false; // Kembalikan ke mode standby
+
+		} else {
+			// =========================================================
+			// E. MODE STANDBY PURE (Mesin nganggur menunggu perintah PC)
+			// =========================================================
+			vTaskDelay(pdMS_TO_TICKS(50));
+		}
     }
 }
 

@@ -44,16 +44,31 @@ class MesinLasHMI:
         frame_manual = ttk.LabelFrame(self.root, text=" 2. Mode Manual & Pemantauan (Live) ")
         frame_manual.pack(padx=10, pady=5, fill="x")
 
-        ttk.Label(frame_manual, text="Posisi X:").grid(row=0, column=0, padx=5, pady=5)
+        # Baris 0: Monitor Live
+        ttk.Label(frame_manual, text="Posisi X Aktual:").grid(row=0, column=0, padx=5, pady=5)
         self.lbl_pos_x = ttk.Label(frame_manual, text="0", font=("Arial", 10, "bold"), foreground="blue")
         self.lbl_pos_x.grid(row=0, column=1, padx=5, pady=5)
 
-        ttk.Label(frame_manual, text="Posisi Y:").grid(row=0, column=2, padx=5, pady=5)
+        ttk.Label(frame_manual, text="Posisi Y Aktual:").grid(row=0, column=2, padx=5, pady=5)
         self.lbl_pos_y = ttk.Label(frame_manual, text="0", font=("Arial", 10, "bold"), foreground="blue")
         self.lbl_pos_y.grid(row=0, column=3, padx=5, pady=5)
 
         self.btn_manual_home = tk.Button(frame_manual, text="HOME MESIN (0,0)", bg="blue", fg="white", font=("Arial", 9, "bold"), command=self.trigger_manual_home, state="disabled")
         self.btn_manual_home.grid(row=0, column=4, padx=10, pady=5)
+
+        # Baris 1: [DIKEMBALIKAN] Input Mode Manual 
+        ttk.Label(frame_manual, text="Target X (Step):").grid(row=1, column=0, padx=5, pady=5)
+        self.entry_man_x = ttk.Entry(frame_manual, width=8)
+        self.entry_man_x.grid(row=1, column=1, padx=5, pady=5)
+        self.entry_man_x.insert(0, "3200")
+
+        ttk.Label(frame_manual, text="Target Y (Step):").grid(row=1, column=2, padx=5, pady=5)
+        self.entry_man_y = ttk.Entry(frame_manual, width=8)
+        self.entry_man_y.grid(row=1, column=3, padx=5, pady=5)
+        self.entry_man_y.insert(0, "3200")
+
+        self.btn_send_manual = ttk.Button(frame_manual, text="KIRIM & LAS", command=self.send_manual_weld, state="disabled")
+        self.btn_send_manual.grid(row=1, column=4, padx=5, pady=5)
 
         # --- 3. FRAME KONTROL OTOMATIS (SETTING PARAMETER) ---
         frame_auto = ttk.LabelFrame(self.root, text=" 3. Mode Otomatis (Setting Parameter Mesin) ")
@@ -140,6 +155,37 @@ class MesinLasHMI:
             self.cb_ports.config(state="normal")
             self.log_message("Koneksi diputus.")
 
+    # =========================================================
+    # LOGIKA MODE MANUAL (DIKEMBALIKAN & DISESUAIKAN)
+    # =========================================================
+    def send_manual_weld(self):
+        if self.is_welding:
+            messagebox.showwarning("Peringatan", "Mesin sedang dalam mode AUTO!")
+            return
+            
+        if self.client and self.client.is_socket_open():
+            try:
+                x_val = int(self.entry_man_x.get())
+                y_val = int(self.entry_man_y.get())
+
+                # Pecah 32-bit jadi 16-bit untuk Modbus
+                x_low = x_val & 0xFFFF
+                x_high = (x_val >> 16) & 0xFFFF
+                y_low = y_val & 0xFFFF
+                y_high = (y_val >> 16) & 0xFFFF
+
+                # 1. Simpan Target X dan Y di Holding Register 6, 7, 8, 9
+                self.client.write_registers(6, [x_low, x_high, y_low, y_high], slave=1)
+                
+                # 2. Tembak Coil 00005 (Offset 4) untuk memicu eksekusi STM32
+                self.client.write_coil(4, True, slave=1)
+
+                self.log_message(f"[MANUAL] Eksekusi Titik Las -> X:{x_val} Y:{y_val}")
+            except ValueError:
+                messagebox.showerror("Error", "Format angka manual salah!")
+            except Exception as e:
+                self.log_message(f"ERROR MANUAL: {str(e)}")
+                
     # =========================================================
     # FUNGSI PEMANTAUAN (POLLING)
     # =========================================================

@@ -49,6 +49,7 @@ extern volatile bool isAborted;
 extern volatile bool ignoreLimitSwitch;
 extern volatile bool flagMintaHoming;
 extern volatile bool isAutoWeldActive;
+extern volatile bool flagManualWeld;
 
 // =========================================================
 // [RTOS HANDLES]

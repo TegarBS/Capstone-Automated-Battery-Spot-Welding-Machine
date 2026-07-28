@@ -31,6 +31,7 @@ volatile bool isAborted = false;
 volatile bool ignoreLimitSwitch = false;
 volatile bool flagMintaHoming = false;
 volatile bool isAutoWeldActive = false;
+volatile bool flagManualWeld = false;
 
 // =========================================================
 // [RTOS HANDLES]
