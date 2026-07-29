@@ -128,7 +128,7 @@ class MesinLasHMI:
             port = self.cb_ports.get()
             if port:
                 # Modbus RTU standar industri (8N1)
-                self.client = ModbusSerialClient(method='rtu', port=port, baudrate=115200, timeout=1)
+                self.client = ModbusSerialClient(port=port, baudrate=115200, timeout=1)
                 if self.client.connect():
                     self.btn_connect.config(text="Disconnect")
                     self.btn_manual_home.config(state="normal")
@@ -175,10 +175,10 @@ class MesinLasHMI:
                 y_high = (y_val >> 16) & 0xFFFF
 
                 # 1. Simpan Target X dan Y di Holding Register 6, 7, 8, 9
-                self.client.write_registers(6, [x_low, x_high, y_low, y_high], slave=1)
+                self.client.write_registers(6, [x_low, x_high, y_low, y_high])
                 
                 # 2. Tembak Coil 00005 (Offset 4) untuk memicu eksekusi STM32
-                self.client.write_coil(4, True, slave=1)
+                self.client.write_coil(4, True)
 
                 self.log_message(f"[MANUAL] Eksekusi Titik Las -> X:{x_val} Y:{y_val}")
             except ValueError:
@@ -195,7 +195,7 @@ class MesinLasHMI:
             if self.client and self.client.is_socket_open():
                 try:
                     # Baca 4 Input Register (Alamat 0, 1, 2, 3) -> 30001, 30002, dll
-                    result = self.client.read_input_registers(address=0, count=4, slave=1)
+                    result = self.client.read_input_registers(address=0, count=4)
                     if not result.isError():
                         # Rekonstruksi 32-bit dari dua 16-bit register
                         x_pos = (result.registers[1] << 16) | result.registers[0]
@@ -225,7 +225,7 @@ class MesinLasHMI:
         if self.client and self.client.is_socket_open():
             try:
                 # Tembak Coil 00003 (Offset 2) ke True untuk Homing
-                self.client.write_coil(2, True, slave=1) 
+                self.client.write_coil(2, True) 
                 self.log_message("[AKSI] Perintah HOMING dikirim ke Mesin.")
             except Exception as e:
                 self.log_message(f"ERROR HOMING: {str(e)}")
@@ -247,12 +247,15 @@ class MesinLasHMI:
                 return
             
             try:
-                # 1. Kirim Konfigurasi Parameter (Write Multiple Registers mulai alamat 0000)
+                # 1. Kirim Konfigurasi Parameter (Write Single Register berurutan)
                 self.log_message("Mengirim parameter ke MCU...")
-                self.client.write_registers(0, [cols, rows, pitch_x_int, pitch_y_int], slave=1)
-                
+                self.client.write_register(0, cols)
+                self.client.write_register(1, rows)
+                self.client.write_register(2, pitch_x_int)
+                self.client.write_register(3, pitch_y_int)
+
                 # 2. Picu Tombol START (Coil 00001 / Offset 0)
-                self.client.write_coil(0, True, slave=1)
+                self.client.write_coil(0, True)
                 
                 self.is_welding = True
                 self.is_paused = False
@@ -275,12 +278,12 @@ class MesinLasHMI:
                 if self.is_paused:
                     self.btn_pause_auto.config(text="RESUME", bg="yellow")
                     # Tembak Coil PAUSE ON (Coil 00004 / Offset 3)
-                    self.client.write_coil(3, True, slave=1) 
+                    self.client.write_coil(3, True) 
                     self.log_message("=== PERINTAH JEDA DIKIRIM ===")
                 else:
                     self.btn_pause_auto.config(text="PAUSE", bg="orange")
                     # Tembak Coil PAUSE OFF
-                    self.client.write_coil(3, False, slave=1) 
+                    self.client.write_coil(3, False) 
                     self.log_message("=== PERINTAH LANJUT (RESUME) DIKIRIM ===")
             except Exception as e:
                 self.log_message(f"ERROR PAUSE: {str(e)}")
@@ -289,7 +292,7 @@ class MesinLasHMI:
         if self.client and self.client.is_socket_open():
             try:
                 # Tembak Sinyal E-STOP ke STM32 (Coil 00002 / Offset 1)
-                self.client.write_coil(1, True, slave=1)
+                self.client.write_coil(1, True)
                 
                 self.is_welding = False
                 self.is_paused = False
