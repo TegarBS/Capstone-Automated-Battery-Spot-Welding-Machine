@@ -22,5 +22,10 @@ venv/
 env/
 .pytest_cache/
 
+<<<<<<< HEAD
 .tmp.drivedownload
 .tmp.driveupload
+=======
+.tmp.driveupload
+.tmp.drivedownload
+>>>>>>> refs/heads/PemindahanKoordinat

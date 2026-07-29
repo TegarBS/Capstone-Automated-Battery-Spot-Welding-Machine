@@ -10,6 +10,9 @@
 // =========================================================
 // 1 [STRUCT & KONSTANTA]
 // =========================================================
+const float STEPS_PER_MM = 160.0f; // Sesuaikan dengan microstep & pitch mekanik Anda
+const uint8_t ACK_OK = 0x01;
+
 GPIO_PinState LIMIT_X_Pressed = GPIO_PIN_SET;
 GPIO_PinState LIMIT_Y_Pressed = GPIO_PIN_SET;
 
@@ -28,6 +31,9 @@ volatile float Y_HOMING_MAX_SPEED = 6000.0f;
 StepperMotor* motorX = NULL;
 StepperMotor* motorY = NULL;
 
+volatile uint16_t JarakXSetelahHoming = 3200;
+volatile uint16_t JarakYSetelahHoming = 3200;
+
 // =========================================================
 // 3 [BENDERA KONTROL MESIN (STATE MACHINE)]
 // =========================================================
@@ -35,7 +41,9 @@ volatile bool isNavigating = false;
 volatile bool isPaused = false;
 volatile bool isAborted = false;
 volatile bool ignoreLimitSwitch = false;
-volatile bool flagHoming = false;
+volatile bool flagMintaHoming = false;
+volatile bool isAutoWeldActive = false;
+volatile bool flagManualWeld = false;
 
 // =========================================================
 // [RTOS HANDLES]
@@ -55,8 +63,10 @@ uint8_t rxBuffer[32]; // Diperbesar sedikit untuk Modbus
 uint8_t rxIndex = 0;
 
 // =========================================================
-// Queue
+// Tracker CAM Zig-Zag
 // =========================================================
-QueueHandle_t Queue_Koordinat;
+MesinConfig_t configLas = {0, 0, 0.0f, 0.0f};
+uint16_t indexKolomAktual = 0;
+uint16_t indexBarisAktual = 0;
 
 

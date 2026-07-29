@@ -21,6 +21,16 @@ typedef struct {
     long y;
 } Koordinat_t;
 
+typedef struct {
+    uint16_t totalKolom;
+    uint16_t totalBaris;
+    float pitchX;
+    float pitchY;
+} MesinConfig_t;
+
+extern const float STEPS_PER_MM;
+extern const uint8_t ACK_OK;
+
 extern GPIO_PinState LIMIT_X_Pressed;
 extern GPIO_PinState LIMIT_Y_Pressed;
 
@@ -39,6 +49,9 @@ extern volatile float Y_HOMING_MAX_SPEED;
 extern StepperMotor* motorX;
 extern StepperMotor* motorY;
 
+extern volatile uint16_t JarakXSetelahHoming;
+extern volatile uint16_t JarakYSetelahHoming;
+
 // =========================================================
 // 3 [BENDERA KONTROL MESIN (STATE MACHINE)]
 // =========================================================
@@ -46,7 +59,9 @@ extern volatile bool isNavigating;
 extern volatile bool isPaused;
 extern volatile bool isAborted;
 extern volatile bool ignoreLimitSwitch;
-extern volatile bool flagHoming;
+extern volatile bool flagMintaHoming;
+extern volatile bool isAutoWeldActive;
+extern volatile bool flagManualWeld;
 
 // =========================================================
 // [RTOS HANDLES]
@@ -66,9 +81,11 @@ extern uint8_t rxBuffer[32]; // Diperbesar sedikit untuk Modbus
 extern uint8_t rxIndex;
 
 // =========================================================
-// Queue
+// [TRACKER CAM ZIG-ZAG]
 // =========================================================
-extern QueueHandle_t Queue_Koordinat;
+extern MesinConfig_t configLas;
+extern uint16_t indexKolomAktual;
+extern uint16_t indexBarisAktual;
 
 // =========================================================
 // Pointer Hardware dari CubeMX (main.c)
