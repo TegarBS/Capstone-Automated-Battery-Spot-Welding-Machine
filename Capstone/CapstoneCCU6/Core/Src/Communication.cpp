@@ -51,6 +51,7 @@ void Task_Komunikasi(void *pvParameters) {
                     txBuffer[3 + byte_count] = crc_tx & 0xFF;
                     txBuffer[4 + byte_count] = (crc_tx >> 8) & 0xFF;
 
+                    vTaskDelay(5);
                     HAL_UART_Transmit(&huart1, txBuffer, 5 + byte_count, 100);
                 }
             }
@@ -88,6 +89,7 @@ void Task_Komunikasi(void *pvParameters) {
 				}
 
                 // Echo balik ke Master (HMI) tanda sukses
+                vTaskDelay(5);
                 HAL_UART_Transmit(&huart1, rxBuffer, len, 100);
             }
 
@@ -112,6 +114,7 @@ void Task_Komunikasi(void *pvParameters) {
                     // tersimpan di Holding_Registers karena dibaca langsung oleh Sequencer
                 }
 
+                vTaskDelay(5);
                 HAL_UART_Transmit(&huart1, rxBuffer, len, 100);
             }
 
@@ -128,6 +131,7 @@ void Task_Komunikasi(void *pvParameters) {
                 txBuffer[3] = crc_tx & 0xFF;
                 txBuffer[4] = (crc_tx >> 8) & 0xFF;
 
+                vTaskDelay(5);
                 HAL_UART_Transmit(&huart1, txBuffer, 5, 100);
             }
         }
