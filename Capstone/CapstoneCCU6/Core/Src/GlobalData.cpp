@@ -22,6 +22,9 @@ GPIO_PinState LIMIT_Y_Pressed = GPIO_PIN_SET;;
 StepperMotor* motorX = NULL;
 StepperMotor* motorY = NULL;
 
+volatile uint16_t JarakXSetelahHoming = 3200;
+volatile uint16_t JarakYSetelahHoming = 3200;
+
 // =========================================================
 // 3 [BENDERA KONTROL MESIN (STATE MACHINE)]
 // =========================================================

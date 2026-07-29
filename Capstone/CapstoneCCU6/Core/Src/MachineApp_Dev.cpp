@@ -8,7 +8,7 @@
 #include "MachineApp.h"
 #include "StepperMotor.h"
 #include "main.h"
-#include "Communication.h" // Header Modbus & Queue
+#include "Communication.h"
 #include "GlobalData.h"
 
 // Definisi Pin Fiktif untuk Relay dan Las
@@ -46,7 +46,6 @@ void MachineApp_Init(void) {
 
 void MachineApp_Loop(void) {}
 
-// --- TASK RTOS: Eksekutor Sekuensial Las ---
 // --- TASK RTOS: Eksekutor Sekuensial Las (OTAK CAM) ---
 void Task_Sequencer(void *pvParameters) {
     vTaskDelay(pdMS_TO_TICKS(500)); // Jeda inisialisasi hardware
@@ -92,8 +91,8 @@ void Task_Sequencer(void *pvParameters) {
             // --- TAHAP 2: PULL-OFF (Maju agar sakelar terlepas) ---
             ignoreLimitSwitch = true;
             isNavigating = true;
-            motorX->setTarget(3200);
-            motorY->setTarget(3200);
+            motorX->setTarget(JarakXSetelahHoming);
+            motorY->setTarget(JarakYSetelahHoming);
 
             xSemaphoreTake(SinyalPosisiTercapai, portMAX_DELAY);
             ignoreLimitSwitch = false;

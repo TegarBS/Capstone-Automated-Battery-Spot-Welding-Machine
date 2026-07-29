@@ -40,6 +40,9 @@ extern GPIO_PinState LIMIT_Y_Pressed;
 extern StepperMotor* motorX;
 extern StepperMotor* motorY;
 
+extern volatile uint16_t JarakXSetelahHoming;
+extern volatile uint16_t JarakYSetelahHoming;
+
 // =========================================================
 // 3 [BENDERA KONTROL MESIN (STATE MACHINE)]
 // =========================================================
