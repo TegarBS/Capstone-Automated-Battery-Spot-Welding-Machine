@@ -24,6 +24,15 @@ typedef struct {
 extern GPIO_PinState LIMIT_X_Pressed;
 extern GPIO_PinState LIMIT_Y_Pressed;
 
+extern volatile float X_MAX_SPEED;
+extern volatile float Y_MAX_SPEED;
+
+extern volatile float X_MIN_SPEED;
+extern volatile float Y_MIN_SPEED;
+
+extern volatile float X_HOMING_MAX_SPEED;
+extern volatile float Y_HOMING_MAX_SPEED;
+
 // =========================================================
 // 2 [OBJEK & PERIPHERAL]
 // =========================================================

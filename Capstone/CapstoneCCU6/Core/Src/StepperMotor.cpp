@@ -7,7 +7,7 @@
 
 #include "StepperMotor.h"
 
-StepperMotor::StepperMotor(GPIO_TypeDef* step_port, uint16_t step_pin, GPIO_TypeDef* dir_port, uint16_t dir_pin, TIM_HandleTypeDef* timer) {
+StepperMotor::StepperMotor(GPIO_TypeDef* step_port, uint16_t step_pin, GPIO_TypeDef* dir_port, uint16_t dir_pin, TIM_HandleTypeDef* timer, float MIN_SPEED) {
     stepPort = step_port;
     stepPin = step_pin;
     dirPort = dir_port;
@@ -22,7 +22,7 @@ StepperMotor::StepperMotor(GPIO_TypeDef* step_port, uint16_t step_pin, GPIO_Type
 
     // Inisialisasi Parameter Fisika
 	timerClock = 4000000;  // Pastikan sesuai dengan Prescaler di CubeMX
-	minFreq = 500.0f;      // Mulai dari 500 Hz (Sangat halus, bebas getar)
+	minFreq = MIN_SPEED;      // Mulai dari 500 Hz (Sangat halus, bebas getar)
 	maxFreq = 20833.0f;    // Target kecepatan puncak (~20 kHz)
 }
 
@@ -63,6 +63,11 @@ void StepperMotor::setTarget(long target) {
 
 void StepperMotor::setInvertDirection(bool invert) {
     invertDir = invert;
+}
+
+// Mengubah kecepatan puncak secara dinamis (on-the-fly)
+void StepperMotor::setMaxSpeed(float newMaxFreq) {
+    maxFreq = newMaxFreq;
 }
 
 // FUNGSI INI BERJALAN 100% DI DALAM INTERUPSI HARDWARE

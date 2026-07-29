@@ -26,8 +26,8 @@ void Task_Monitor(void *pvParameters);
 
 // --- FUNGSI INISIALISASI MESIN ---
 void MachineApp_Init(void) {
-    motorX = new StepperMotor(STEP_X_GPIO_Port, STEP_X_Pin, DIR_X_GPIO_Port, DIR_X_Pin, &htim2);
-    motorY = new StepperMotor(STEP_Y_GPIO_Port, STEP_Y_Pin, DIR_Y_GPIO_Port, DIR_Y_Pin, &htim3);
+    motorX = new StepperMotor(STEP_X_GPIO_Port, STEP_X_Pin, DIR_X_GPIO_Port, DIR_X_Pin, &htim2, X_MIN_SPEED);
+    motorY = new StepperMotor(STEP_Y_GPIO_Port, STEP_Y_Pin, DIR_Y_GPIO_Port, DIR_Y_Pin, &htim3, Y_MIN_SPEED);
 
     //Motor X terbalik
     motorX->setInvertDirection(true);
@@ -75,6 +75,9 @@ void Task_Sequencer(void *pvParameters) {
             // =========================================================
             if (target.x == -999999 && target.y == -999999) {
 
+            	motorX->setMaxSpeed(X_HOMING_MAX_SPEED);
+            	motorY->setMaxSpeed(Y_HOMING_MAX_SPEED);
+
                 // --- TAHAP 1: SEEK (Mencari Limit Switch dengan Pre-Flight Check) ---
                 isNavigating = true;
 
@@ -120,6 +123,9 @@ void Task_Sequencer(void *pvParameters) {
                 // Titik setelah mundur ini adalah titik (0,0) yang asli dan aman!
                 motorX->resetPosition();
                 motorY->resetPosition();
+
+                motorX->setMaxSpeed(20833.0f);
+                motorY->setMaxSpeed(20833.0f);
 
                 continue; // Selesai Homing, lanjut baca antrean Queue berikutnya
             }

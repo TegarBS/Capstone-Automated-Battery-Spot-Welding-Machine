@@ -11,7 +11,16 @@
 // 1 [STRUCT & KONSTANTA]
 // =========================================================
 GPIO_PinState LIMIT_X_Pressed = GPIO_PIN_SET;
-GPIO_PinState LIMIT_Y_Pressed = GPIO_PIN_SET;;
+GPIO_PinState LIMIT_Y_Pressed = GPIO_PIN_SET;
+
+volatile float X_MAX_SPEED = 20833.0f;
+volatile float Y_MAX_SPEED = 20833.0f;
+
+volatile float X_MIN_SPEED = 3000.0f;
+volatile float Y_MIN_SPEED = 3000.0f;
+
+volatile float X_HOMING_MAX_SPEED = 6000.0f;
+volatile float Y_HOMING_MAX_SPEED = 6000.0f;
 
 // =========================================================
 // 2 [OBJEK & PERIPHERAL]

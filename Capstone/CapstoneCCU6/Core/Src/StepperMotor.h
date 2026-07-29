@@ -40,10 +40,11 @@ public:
     bool isMoving;
 
     // Constructor kini meminta input Hardware Timer
-    StepperMotor(GPIO_TypeDef* step_port, uint16_t step_pin, GPIO_TypeDef* dir_port, uint16_t dir_pin, TIM_HandleTypeDef* timer);
+    StepperMotor(GPIO_TypeDef* step_port, uint16_t step_pin, GPIO_TypeDef* dir_port, uint16_t dir_pin, TIM_HandleTypeDef* timer, float MIN_SPEED);
 
     void setTarget(long target);
     void setInvertDirection(bool invert);
+    void setMaxSpeed(float newMaxFreq);
 
     // Fungsi ini BUKAN dipanggil dari loop, tapi langsung oleh Interupsi Timer!
     void isr_update();
