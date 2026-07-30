@@ -5,6 +5,8 @@
 // TASK KOMUNIKASI (PARSER MODBUS RTU)
 // =========================================================
 #include "Communication.h"
+
+#include "FungsiEEPROM.h"
 #include "GlobalData.h"
 
 // =========================================================
@@ -83,9 +85,30 @@ void Task_Komunikasi(void *pvParameters) {
 					if (coil_val == 0xFF00) isPaused = true;
 					else isPaused = false;
 				}
-				// [BARU] COIL 4: TRIGGER MODE MANUAL
+				// COIL 4: TRIGGER MODE MANUAL
 				else if (coil_addr == 0x0004 && coil_val == 0xFF00) {
 					flagManualWeld = true; // Bangunkan Sequencer untuk mode manual
+				}
+                // COIL 5: TRIGGER SAVE TO FLASH (EEPROM)
+				else if (coil_addr == 0x0005 && coil_val == 0xFF00) {
+
+					// Coba simpan ke Flash
+					if (Save_Settings_To_Flash() == true) {
+						// Jika berhasil (Mesin aman), Echo balik ke HMI tanda sukses
+						HAL_UART_Transmit(&huart1, rxBuffer, len, 100);
+					} else {
+						// Jika Gagal (Mesin sibuk), Kirim Modbus Exception 0x06 (Slave Device Busy)
+						uint8_t txBuffer[5];
+						txBuffer[0] = rxBuffer[0];          // Slave ID
+						txBuffer[1] = function_code | 0x80; // Function Code + 0x80 (Penanda Error)
+						txBuffer[2] = 0x06;                 // Exception 0x06: Slave Device Busy
+
+						uint16_t crc_tx = Hitung_CRC16(txBuffer, 3);
+						txBuffer[3] = crc_tx & 0xFF;
+						txBuffer[4] = (crc_tx >> 8) & 0xFF;
+
+						HAL_UART_Transmit(&huart1, txBuffer, 5, 100);
+					}
 				}
 
                 // Echo balik ke Master (HMI) tanda sukses

@@ -25,8 +25,8 @@ Koordinat_t CalculateNextTarget();
 
 // --- FUNGSI INISIALISASI MESIN ---
 void MachineApp_Init(void) {
-    motorX = new StepperMotor(STEP_X_GPIO_Port, STEP_X_Pin, DIR_X_GPIO_Port, DIR_X_Pin, &htim2, X_MIN_SPEED);
-    motorY = new StepperMotor(STEP_Y_GPIO_Port, STEP_Y_Pin, DIR_Y_GPIO_Port, DIR_Y_Pin, &htim3, Y_MIN_SPEED);
+    motorX = new StepperMotor(STEP_X_GPIO_Port, STEP_X_Pin, DIR_X_GPIO_Port, DIR_X_Pin, &htim2, X_MIN_SPEED, X_MAX_SPEED);
+    motorY = new StepperMotor(STEP_Y_GPIO_Port, STEP_Y_Pin, DIR_Y_GPIO_Port, DIR_Y_Pin, &htim3, Y_MIN_SPEED, Y_MAX_SPEED);
 
     //Motor X terbalik
     motorX->setInvertDirection(true);
