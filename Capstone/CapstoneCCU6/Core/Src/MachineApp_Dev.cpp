@@ -216,7 +216,7 @@ void Task_Sequencer(void *pvParameters) {
 			HAL_GPIO_WritePin(RELAY_Z_PORT, RELAY_Z_PIN, GPIO_PIN_RESET);
 			vTaskDelay(pdMS_TO_TICKS(200));
 
-			flagManualWeld = false; // Kembalikan ke mode standby
+			flagManualWeld = false; // Kembalikan ke mode standb
 
 		} else {
 			// =========================================================
