@@ -174,8 +174,11 @@ class MesinLasHMI:
                 y_low = y_val & 0xFFFF
                 y_high = (y_val >> 16) & 0xFFFF
 
-                # 1. Simpan Target X dan Y di Holding Register 6, 7, 8, 9
-                self.client.write_registers(6, [x_low, x_high, y_low, y_high])
+                # 1. Simpan Target X dan Y di Holding Register 6, 7, 8, 9 berurutan
+                self.client.write_register(6, x_low)
+                self.client.write_register(7, x_high)
+                self.client.write_register(8, y_low)
+                self.client.write_register(9, y_high)
                 
                 # 2. Tembak Coil 00005 (Offset 4) untuk memicu eksekusi STM32
                 self.client.write_coil(4, True)
@@ -212,8 +215,12 @@ class MesinLasHMI:
             time.sleep(0.5)
 
     def update_position_labels(self, x, y):
-        self.lbl_pos_x.config(text=str(x))
-        self.lbl_pos_y.config(text=str(y))
+        # Kembalikan ke nilai desimal (dibagi 100) dan tambahkan teks " mm"
+        posisi_x_mm = x / 100.0
+        posisi_y_mm = y / 100.0
+        
+        self.lbl_pos_x.config(text=f"{posisi_x_mm:.2f} mm")
+        self.lbl_pos_y.config(text=f"{posisi_y_mm:.2f} mm")
 
     # =========================================================
     # FUNGSI AKSI & PERINTAH (MODBUS WRITE)

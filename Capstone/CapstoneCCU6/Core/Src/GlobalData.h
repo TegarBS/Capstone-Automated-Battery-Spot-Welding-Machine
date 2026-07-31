@@ -22,6 +22,8 @@ typedef struct {
     uint16_t stepsPerMmY;
     uint16_t maxSpeed;
     uint16_t accelSpeed;
+    uint16_t weldCount;
+    uint16_t spotSpacing_x10;
 
     uint16_t STEP_PER_MM_X;
     uint16_t STEP_PER_MM_Y;
@@ -35,9 +37,9 @@ typedef struct {
     uint16_t SPEED_MIN_Y;
     uint16_t SPEED_MIN_Z;
 
-    uint16_t ACC_X;
-    uint16_t ACC_Y;
-    uint16_t ACC_Z;
+    uint16_t ACCEL_X;
+    uint16_t ACCEL_Y;
+    uint16_t ACCEL_Z;
 
     uint16_t TRAVEL_MAX_X;
     uint16_t TRAVEL_MAX_Y;
@@ -55,6 +57,9 @@ typedef struct {
     uint16_t DIRECTION_Y;
     uint16_t DIRECTION_Z;
 
+    uint16_t WELD_COUNT;
+    uint16_t SPOT_SPACING_X10; //Jika ingin jarak 2.0mm, data dikirim bernilai 20
+
 } PermanentSettings_t;
 
 extern PermanentSettings_t eepromSettings;
@@ -63,8 +68,8 @@ extern PermanentSettings_t eepromSettings;
 // 1 [STRUCT & KONSTANTA]
 // =========================================================
 typedef struct {
-    long x;
-    long y;
+    float x;
+    float y;
 } Koordinat_t;
 
 typedef struct {

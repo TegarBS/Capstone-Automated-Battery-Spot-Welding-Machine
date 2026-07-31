@@ -19,8 +19,8 @@ private:
     uint16_t dirPin;
     TIM_HandleTypeDef* htim; // Pointer ke Hardware Timer (TIM2 / TIM3)
 
-    long currentPosition;
-    long targetPosition;
+    long currentPositionPulse;
+    long targetPositionPulse;
     bool invertDir;
 
     // --- Variabel Dynamic ARR (Akselerasi Trapesium) ---
@@ -51,7 +51,7 @@ public:
 
     void stop();
     void resetPosition();
-    long getCurrentPosition();
+    long getCurrentPositionPulse();
 };
 
 #endif /* SRC_STEPPERMOTOR_H_ */

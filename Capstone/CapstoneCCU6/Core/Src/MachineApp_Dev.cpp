@@ -21,7 +21,9 @@
 
 void Task_Sequencer(void *pvParameters);
 void Task_Monitor(void *pvParameters);
-Koordinat_t CalculateNextTarget();
+Koordinat_t CalculateBatteryCenter_mm();
+long Convert_mm_to_PulseX(float target_mm);
+long Convert_mm_to_PulseY(float target_mm);
 
 // --- FUNGSI INISIALISASI MESIN ---
 void MachineApp_Init(void) {
@@ -140,44 +142,72 @@ void Task_Sequencer(void *pvParameters) {
             }
             if (isAborted) continue;
 
-            // 3. KALKULASI TARGET BERIKUTNYA
-            Koordinat_t target = CalculateNextTarget();
+			// 3. KALKULASI TITIK PUSAT BATERAI SAAT INI
+			Koordinat_t center = CalculateBatteryCenter_mm();
 
-            // 4. BERGERAK KE TARGET (Zero-Distance Deadlock Fix)
-            isNavigating = true;
-            motorX->setTarget(target.x);
-            motorY->setTarget(target.y);
+			// =========================================================
+			// 4. MINI-LOOP: EKSEKUSI BEBERAPA TITIK DI 1 BATERAI
+			// =========================================================
+			for (uint16_t i = 0; i < eepromSettings.weldCount; i++) {
 
-            if (motorX->isMoving || motorY->isMoving) {
-                xSemaphoreTake(SinyalPosisiTercapai, portMAX_DELAY);
-            } else {
-                isNavigating = false;
-            }
+				// A. Kalkulasi Pergeseran Simetris di SUMBU Y (Offset Vertikal)
+				// Jika jarum las sejajar sumbu X, kita menggeser Y agar membentuk KOTAK
+				float offsetY_mm = 0.0f;
+				if (eepromSettings.weldCount > 1) {
+					float spacing = (float)eepromSettings.spotSpacing_x10 / 10.0f;
+					float totalHeight = spacing * (eepromSettings.weldCount - 1);
+					// Mulai dari titik bawah, bergerak ke atas (atau sebaliknya)
+					float startY = -(totalHeight / 2.0f);
+					offsetY_mm = startY + (i * spacing);
+				}
 
-            if (isAborted) continue;
-            while (isPaused && !isAborted) vTaskDelay(pdMS_TO_TICKS(50));
-            if (isAborted) continue;
+				// B. Konversi ke Pulse & Bergerak!
+				// Sumbu X tetap di titik tengah baterai, Sumbu Y yang ditambah pergeseran
+				long targetPulseX = Convert_mm_to_PulseX(center.x);
+				long targetPulseY = Convert_mm_to_PulseY(center.y + offsetY_mm);
 
-            // 5. PROSES PENGELASAN
-            HAL_GPIO_WritePin(RELAY_Z_PORT, RELAY_Z_PIN, GPIO_PIN_SET);
-            vTaskDelay(pdMS_TO_TICKS(200));
+				isNavigating = true;
+				motorX->setTarget(targetPulseX);
+				motorY->setTarget(targetPulseY);
 
-            HAL_GPIO_WritePin(WELD_PORT, WELD_PIN, GPIO_PIN_SET);
-            vTaskDelay(pdMS_TO_TICKS(30));
-            HAL_GPIO_WritePin(WELD_PORT, WELD_PIN, GPIO_PIN_RESET);
+				if (motorX->isMoving || motorY->isMoving) {
+					xSemaphoreTake(SinyalPosisiTercapai, portMAX_DELAY);
+				} else {
+					isNavigating = false;
+				}
 
-            HAL_GPIO_WritePin(RELAY_Z_PORT, RELAY_Z_PIN, GPIO_PIN_RESET);
-            vTaskDelay(pdMS_TO_TICKS(200));
+				// Pengecekan Darurat di tengah-tengah Mini-Loop
+				if (isAborted) break;
+				while (isPaused && !isAborted) vTaskDelay(pdMS_TO_TICKS(50));
+				if (isAborted) break;
 
-            // 6. UPDATE INDEX BATERAI (Otomatis geser untuk loop selanjutnya)
-            indexKolomAktual++;
+				// C. Proses Pengelasan (Menghasilkan 2 titik secara fisik karena 2 jarum X)
+				HAL_GPIO_WritePin(RELAY_Z_PORT, RELAY_Z_PIN, GPIO_PIN_SET);
+				vTaskDelay(pdMS_TO_TICKS(Holding_Registers[4])); // Drop Delay
 
-            if (indexKolomAktual >= configLas.totalKolom) {
-                indexKolomAktual = 0;       // Reset kolom ke 0
-                indexBarisAktual++;         // Pindah ke baris atasnya
-            }
+				HAL_GPIO_WritePin(WELD_PORT, WELD_PIN, GPIO_PIN_SET);
+				vTaskDelay(pdMS_TO_TICKS(Holding_Registers[5])); // Weld Time
+				HAL_GPIO_WritePin(WELD_PORT, WELD_PIN, GPIO_PIN_RESET);
 
-            vTaskDelay(pdMS_TO_TICKS(10)); // Jeda CPU sebelum ke titik berikutnya
+				HAL_GPIO_WritePin(RELAY_Z_PORT, RELAY_Z_PIN, GPIO_PIN_RESET);
+				vTaskDelay(pdMS_TO_TICKS(200)); // Waktu tunggu pneumatik naik sempurna
+
+				// Jeda sepersekian detik sebelum motor bergeser vertikal ke titik sebelahnya
+				vTaskDelay(pdMS_TO_TICKS(50));
+			}
+
+			// Jika mesin dihentikan saat mini-loop berjalan, lompat siklus
+			if (isAborted) continue;
+
+			// 6. UPDATE INDEX BATERAI
+			indexKolomAktual++;
+
+			if (indexKolomAktual >= configLas.totalKolom) {
+				indexKolomAktual = 0;
+				indexBarisAktual++;
+			}
+
+			vTaskDelay(pdMS_TO_TICKS(10));
 
         } else if (flagManualWeld) {
 			// =========================================================
@@ -303,55 +333,85 @@ void Task_Monitor(void *pvParameters) {
     uint32_t counter_led = 0;
 
     while(1) {
-        // --- 1. UPDATE REGISTER MODBUS ---
+        // --- 1. UPDATE REGISTER MODBUS (MONITORING POSISI) ---
         if (motorX && motorY) {
-            long currentX = motorX->getCurrentPosition();
-            long currentY = motorY->getCurrentPosition();
+            long currentX_pulse = motorX->getCurrentPositionPulse();
+            long currentY_pulse = motorY->getCurrentPositionPulse();
 
-            // Pecah 32-bit (long) menjadi 2 bagian 16-bit (Register)
-            Input_Registers[0] = currentX & 0xFFFF;
-            Input_Registers[1] = (currentX >> 16) & 0xFFFF;
-            Input_Registers[2] = currentY & 0xFFFF;
-            Input_Registers[3] = (currentY >> 16) & 0xFFFF;
+            // KONVERSI KE MILIMETER DENGAN PRESISI x100
+            // Rumus: (Pulse * 100) / Steps_per_mm
+            long currentX_mm = (currentX_pulse * 100) / eepromSettings.stepsPerMmX;
+            long currentY_mm = (currentY_pulse * 100) / eepromSettings.stepsPerMmY;
+
+            // Pecah 32-bit (long) menjadi 2 bagian 16-bit untuk Input Register Modbus
+            Input_Registers[0] = currentX_mm & 0xFFFF;
+            Input_Registers[1] = (currentX_mm >> 16) & 0xFFFF;
+            Input_Registers[2] = currentY_mm & 0xFFFF;
+            Input_Registers[3] = (currentY_mm >> 16) & 0xFFFF;
         }
 
         // --- 2. KEDIP LED INDIKATOR RTOS ---
         counter_led++;
-        // Task berjalan tiap 10ms. 10ms x 100 = 1000ms (1 Detik)
-        if (counter_led >= 100) {
+        // Task berjalan tiap 100ms. 100ms x 10 = 1000ms (1 Detik)
+        if (counter_led >= 10) {
             HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
             counter_led = 0;
         }
 
-        // Tidurkan task selama 10 milidetik
-        vTaskDelay(pdMS_TO_TICKS(10));
+        // Tidurkan task selama 100 milidetik
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
 
+
 // =========================================================
-// [FUNGSI OTAK CAM: KALKULATOR TARGET ZIG-ZAG ABSOLUT]
+// [FUNGSI OTAK CAM: PUSAT BATERAI (ZIG-ZAG)]
 // =========================================================
-Koordinat_t CalculateNextTarget() {
-    Koordinat_t target;
-    float targetX_mm = 0.0;
-    float targetY_mm = 0.0;
+Koordinat_t CalculateBatteryCenter_mm() {
+    Koordinat_t center;
 
     // 1. Hitung Posisi Y (Selalu naik sesuai baris)
-    targetY_mm = indexBarisAktual * configLas.pitchY;
+    center.y = indexBarisAktual * configLas.pitchY;
 
     // 2. Hitung Posisi X dengan Pola ZIG-ZAG
     if (indexBarisAktual % 2 == 0) {
-        // BARIS GENAP (0, 2, 4): Las bergerak Maju (Kiri ke Kanan)
-        targetX_mm = indexKolomAktual * configLas.pitchX;
+        center.x = indexKolomAktual * configLas.pitchX;
     } else {
-        // BARIS GANJIL (1, 3, 5): Las bergerak Mundur (Kanan ke Kiri)
-        targetX_mm = (configLas.totalKolom - 1 - indexKolomAktual) * configLas.pitchX;
+        center.x = (configLas.totalKolom - 1 - indexKolomAktual) * configLas.pitchX;
     }
 
-    // 3. Konversi Milimeter ke Step Absolut
-    target.x = (long)(targetX_mm * STEPS_PER_MM);
-    target.y = (long)(targetY_mm * STEPS_PER_MM);
-
-    return target;
+    return center;
 }
 
+// =========================================================
+// [FUNGSI UTILITAS: KONVERSI MILIMETER KE PULSE/STEP]
+// =========================================================
+
+/**
+ * Mengonversi jarak milimeter (Sumbu X) menjadi jumlah pulsa motor
+ * @param target_mm Jarak yang diinginkan dalam milimeter (bisa bernilai negatif)
+ * @return Jumlah pulsa absolut (32-bit signed integer)
+ */
+long Convert_mm_to_PulseX(float target_mm) {
+    // Trik CNC: Tambahkan 0.5f untuk pembulatan (rounding) ke nearest integer.
+    // Jika tidak, angka 10.9 step akan dipotong (truncate) menjadi 10 step oleh C++.
+    if (target_mm >= 0) {
+        return (long)(target_mm * eepromSettings.stepsPerMmX + 0.5f);
+    } else {
+        // Untuk pergerakan mundur (negatif)
+        return (long)(target_mm * eepromSettings.stepsPerMmX - 0.5f);
+    }
+}
+
+/**
+ * Mengonversi jarak milimeter (Sumbu Y) menjadi jumlah pulsa motor
+ * @param target_mm Jarak yang diinginkan dalam milimeter (bisa bernilai negatif)
+ * @return Jumlah pulsa absolut (32-bit signed integer)
+ */
+long Convert_mm_to_PulseY(float target_mm) {
+    if (target_mm >= 0) {
+        return (long)(target_mm * eepromSettings.stepsPerMmY + 0.5f);
+    } else {
+        return (long)(target_mm * eepromSettings.stepsPerMmY - 0.5f);
+    }
+}

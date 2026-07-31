@@ -21,18 +21,11 @@ void Load_Settings_From_Flash() {
         eepromSettings = *flashData;
     } else {
         // Jika Flash masih kosong / pabrikan, beri nilai Default!
-        eepromSettings.magicNumber = MAGIC_NUMBER;
-        eepromSettings.stepsPerMmX = 160;
-        eepromSettings.stepsPerMmY = 160;
-        eepromSettings.maxSpeed = 2000;
-        eepromSettings.accelSpeed = 500;
+    	loadDefault();
     }
 
     // Salin ke Modbus Holding Registers agar bisa dibaca oleh HMI saat konek pertama kali
-    Holding_Registers[10] = eepromSettings.stepsPerMmX;
-    Holding_Registers[11] = eepromSettings.stepsPerMmY;
-    Holding_Registers[12] = eepromSettings.maxSpeed;
-    Holding_Registers[13] = eepromSettings.accelSpeed;
+    salinDataKeRegister();
 }
 
 // --- FUNGSI MENYIMPAN KE FLASH (DENGAN SAFETY INTERLOCK) ---
@@ -53,11 +46,7 @@ bool Save_Settings_To_Flash() {
     }
 
     // 2. Ambil data terbaru dari Holding Registers HMI
-    eepromSettings.magicNumber = MAGIC_NUMBER;
-    eepromSettings.stepsPerMmX = Holding_Registers[10];
-    eepromSettings.stepsPerMmY = Holding_Registers[11];
-    eepromSettings.maxSpeed    = Holding_Registers[12];
-    eepromSettings.accelSpeed  = Holding_Registers[13];
+    ambilDataDariRegister();
 
     // 3. MATIKAN SELURUH AKTIVITAS HARDWARE (GLOBAL DISABLE)
     __disable_irq();
@@ -90,4 +79,27 @@ bool Save_Settings_To_Flash() {
     __enable_irq();
 
     return true; // Penyimpanan Berhasil
+}
+
+void loadDefault(){
+    eepromSettings.magicNumber = MAGIC_NUMBER;
+    eepromSettings.stepsPerMmX = 160;
+    eepromSettings.stepsPerMmY = 160;
+    eepromSettings.maxSpeed = 2000;
+    eepromSettings.accelSpeed = 500;
+}
+
+void salinDataKeRegister(){
+    Holding_Registers[10] = eepromSettings.stepsPerMmX;
+    Holding_Registers[11] = eepromSettings.stepsPerMmY;
+    Holding_Registers[12] = eepromSettings.maxSpeed;
+    Holding_Registers[13] = eepromSettings.accelSpeed;
+}
+
+void ambilDataDariRegister(){
+    eepromSettings.magicNumber = MAGIC_NUMBER;
+    eepromSettings.stepsPerMmX = Holding_Registers[10];
+    eepromSettings.stepsPerMmY = Holding_Registers[11];
+    eepromSettings.maxSpeed    = Holding_Registers[12];
+    eepromSettings.accelSpeed  = Holding_Registers[13];
 }

@@ -14,8 +14,8 @@ StepperMotor::StepperMotor(GPIO_TypeDef* step_port, uint16_t step_pin, GPIO_Type
     dirPin = dir_pin;
     htim = timer;
 
-    currentPosition = 0;
-    targetPosition = 0;
+    currentPositionPulse = 0;
+    targetPositionPulse = 0;
     isMoving = false;
     invertDir = false;
     state = IDLE_STATE;
@@ -28,13 +28,13 @@ StepperMotor::StepperMotor(GPIO_TypeDef* step_port, uint16_t step_pin, GPIO_Type
 }
 
 void StepperMotor::setTarget(long target) {
-    if (currentPosition == target) return;
+    if (currentPositionPulse == target) return;
 
-    targetPosition = target;
-    stepsToGo = abs(targetPosition - currentPosition);
+    targetPositionPulse = target;
+    stepsToGo = abs(targetPositionPulse - currentPositionPulse);
 
     // 1. Tentukan Arah
-    if (targetPosition > currentPosition) {
+    if (targetPositionPulse > currentPositionPulse) {
         HAL_GPIO_WritePin(dirPort, dirPin, invertDir ? GPIO_PIN_RESET : GPIO_PIN_SET);
     } else {
         HAL_GPIO_WritePin(dirPort, dirPin, invertDir ? GPIO_PIN_SET : GPIO_PIN_RESET);
@@ -81,8 +81,8 @@ void StepperMotor::isr_update() {
     HAL_GPIO_WritePin(stepPort, stepPin, GPIO_PIN_RESET);
 
     // 2. Update Koordinat
-    if (targetPosition > currentPosition) currentPosition++;
-    else currentPosition--;
+    if (targetPositionPulse > currentPositionPulse) currentPositionPulse++;
+    else currentPositionPulse--;
     stepsToGo--;
 
     // 3. KALKULASI PROFIL KECEPATAN (BERDASARKAN FREKUENSI)
@@ -118,18 +118,18 @@ void StepperMotor::isr_update() {
 
 void StepperMotor::stop() {
     HAL_TIM_Base_Stop_IT(htim); // Matikan Timer instan!
-    targetPosition = currentPosition;
+    targetPositionPulse = currentPositionPulse;
     isMoving = false;
     state = IDLE_STATE;
 }
 
 void StepperMotor::resetPosition() {
-    currentPosition = 0;
-    targetPosition = 0;
+    currentPositionPulse = 0;
+    targetPositionPulse = 0;
     isMoving = false;
     state = IDLE_STATE;
 }
 
-long StepperMotor::getCurrentPosition() {
-    return currentPosition;
+long StepperMotor::getCurrentPositionPulse() {
+    return currentPositionPulse;
 }

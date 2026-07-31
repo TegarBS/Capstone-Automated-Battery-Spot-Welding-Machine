@@ -11,4 +11,8 @@
 void Load_Settings_From_Flash();
 bool Save_Settings_To_Flash();
 
+void loadDefault();
+void salinDataKeRegister();
+void ambilDataDariRegister();
+
 #endif /* SRC_FUNGSIEEPROM_H_ */
