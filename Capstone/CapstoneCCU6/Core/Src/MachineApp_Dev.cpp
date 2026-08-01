@@ -26,12 +26,11 @@ void Task_Monitor(void *pvParameters);
 
 // --- FUNGSI INISIALISASI MESIN ---
 void MachineApp_Init(void) {
+	void Load_Settings_From_Flash(void);
+
     motorX = new StepperMotor(STEP_X_GPIO_Port, STEP_X_Pin, DIR_X_GPIO_Port, DIR_X_Pin, &htim2);
     motorY = new StepperMotor(STEP_Y_GPIO_Port, STEP_Y_Pin, DIR_Y_GPIO_Port, DIR_Y_Pin, &htim3);
     motorZ = new StepperMotor(STEP_Z_GPIO_Port, STEP_Z_Pin, DIR_Z_GPIO_Port, DIR_Z_Pin, &htim4);
-
-    //Motor X terbalik
-    motorX->setInvertDirection(true);
 
     // Buat Semaphore & Queue
     SinyalPosisiTercapai = xSemaphoreCreateBinary();
@@ -41,6 +40,8 @@ void MachineApp_Init(void) {
     xTaskCreate(Task_Sequencer, "Task_Seq", 512, NULL, 2, NULL);
     xTaskCreate(Task_Komunikasi, "Task_Komunikasi", 512, NULL, 2, NULL);
     xTaskCreate(Task_Monitor, "Task_Mon", 256, NULL, 1, NULL);
+
+    Update_Motor_Speed_From_Settings();
 
     // MENGHIDUPKAN JANTUNG MESIN
     HAL_UART_Receive_IT(&huart1, &rxChar, 1);
@@ -53,13 +54,13 @@ void Task_Sequencer(void *pvParameters) {
     vTaskDelay(pdMS_TO_TICKS(500)); // Jeda inisialisasi hardware
 
     while(1) {
-
         // =========================================================
         // A. KONDISI DARURAT (ABORT)
         // =========================================================
         if (isAborted) {
             isAutoWeldActive = false; // Batalkan siklus otomatis
             isAborted = false;        // Reset bendera
+            isMachineHomed = false;
             HAL_GPIO_WritePin(RELAY_Z_PORT, RELAY_Z_PIN, GPIO_PIN_RESET); // Naikkan pneumatik
             HAL_GPIO_WritePin(WELD_PORT, WELD_PIN, GPIO_PIN_RESET);       // Matikan trafo
         }
@@ -103,8 +104,8 @@ void Task_Sequencer(void *pvParameters) {
 			isNavigating = true;
 
 			// Maju sejauh 3200 step (Sesuaikan angkanya jika dirasa kurang jauh)
-			motorX->setTarget(3200);
-			motorY->setTarget(3200);
+			motorX->setTarget(Convert_mm_to_PulseX(eepromSettings.homingTravelAfterLimitX));
+			motorY->setTarget(Convert_mm_to_PulseY(eepromSettings.homingTravelAfterLimitY));
 
 			// Tunggu sampai motor selesai maju
 			xSemaphoreTake(SinyalPosisiTercapai, portMAX_DELAY);
@@ -119,6 +120,7 @@ void Task_Sequencer(void *pvParameters) {
 
 			Update_Motor_Speed_From_Settings();
 
+			isMachineHomed = true;
             flagMintaHoming = false; // Matikan flag setelah selesai
             continue; // Ulangi loop
 		}
@@ -127,6 +129,11 @@ void Task_Sequencer(void *pvParameters) {
         // C. SIKLUS LAS OTOMATIS (Pola Zig-Zag)
         // =========================================================
         if (isAutoWeldActive) {
+
+        	if (!isMachineHomed) {
+				flagMintaHoming = true; // Angkat bendera minta Homing
+				continue; // Lempar kembali ke atas loop, biarkan Blok B bekerja duluan!
+			}
 
             // 1. Cek apakah seluruh pekerjaan sudah tuntas?
             if (indexBarisAktual >= configLas.totalBaris) {
@@ -207,7 +214,7 @@ void Task_Sequencer(void *pvParameters) {
 
 			vTaskDelay(pdMS_TO_TICKS(10));
 
-        } else if (flagManualWeld) {
+        } else if (flagManualJog) {
 			// =========================================================
 			// D. MODE MANUAL (Single Jog & Weld)
 			// =========================================================
@@ -215,11 +222,13 @@ void Task_Sequencer(void *pvParameters) {
 			// 1. Ambil koordinat 32-bit dari Holding Register 6, 7 (X) dan 8, 9 (Y)
 			long targetManX = ((long)Holding_Registers[7] << 16) | Holding_Registers[6];
 			long targetManY = ((long)Holding_Registers[9] << 16) | Holding_Registers[8];
+			long targetManZ = ((long)Holding_Registers[11] << 16) | Holding_Registers[10];
 
 			// 2. Bergerak ke Target
 			isNavigating = true;
-			motorX->setTarget(targetManX);
-			motorY->setTarget(targetManY);
+			motorX->setTarget(Convert_mm_to_PulseX(targetManX));
+			motorY->setTarget(Convert_mm_to_PulseY(targetManY));
+			motorZ->setTarget(Convert_mm_to_PulseZ(targetManZ));
 
 			// Cegah deadlock jika jarak = 0
 			if (motorX->isMoving || motorY->isMoving) {
@@ -229,22 +238,11 @@ void Task_Sequencer(void *pvParameters) {
 			}
 
 			if (isAborted) {
-				flagManualWeld = false;
+				flagManualJog = false;
 				continue;
 			}
 
-			// 3. Proses Las Manual
-			HAL_GPIO_WritePin(RELAY_Z_PORT, RELAY_Z_PIN, GPIO_PIN_SET);
-			vTaskDelay(pdMS_TO_TICKS(200));
-
-			HAL_GPIO_WritePin(WELD_PORT, WELD_PIN, GPIO_PIN_SET);
-			vTaskDelay(pdMS_TO_TICKS(30));
-			HAL_GPIO_WritePin(WELD_PORT, WELD_PIN, GPIO_PIN_RESET);
-
-			HAL_GPIO_WritePin(RELAY_Z_PORT, RELAY_Z_PIN, GPIO_PIN_RESET);
-			vTaskDelay(pdMS_TO_TICKS(200));
-
-			flagManualWeld = false; // Kembalikan ke mode standb
+			flagManualJog = false; // Kembalikan ke mode standby
 
 		} else {
 			// =========================================================
@@ -275,9 +273,14 @@ extern "C" void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
         if (motorY && !isPaused) motorY->isr_update();
     }
 
+    // 4. EKSEKUSI PULSA MOTOR Z (Hanya jika tidak di-Pause)
+    if (htim->Instance == TIM4) {
+        if (motorZ && !isPaused) motorZ->isr_update();
+    }
+
     // 4. SINKRONISASI KE RTOS (Evaluasi Target atau Abort)
     // Jika sedang navigasi dan kedua motor telah berhenti (entah karena sampai atau di-Abort)
-    if (isNavigating && !motorX->isMoving && !motorY->isMoving) {
+    if (isNavigating && !motorX->isMoving && !motorY->isMoving && !motorZ->isMoving) {
         isNavigating = false;
 
         // Bangunkan Task_Sequencer
@@ -304,6 +307,11 @@ extern "C" void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 	// 2. Deteksi Limit Switch Sumbu Y
 	if (GPIO_Pin == LIMIT_Y_Pin) {
 		if (motorY) motorY->stop(); // Timer Y mati instan
+		isHit = true;
+	}
+
+	if (GPIO_Pin == LIMIT_Z_Pin) {
+		if (motorZ) motorZ->stop(); // Timer Z mati instan
 		isHit = true;
 	}
 

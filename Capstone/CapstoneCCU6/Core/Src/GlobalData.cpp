@@ -15,24 +15,11 @@ PermanentSettings_t eepromSettings = {0}; // Nilai awal kosong
 // =========================================================
 // 1 [STRUCT & KONSTANTA]
 // =========================================================
-const float STEPS_PER_MM = 160.0f; // Sesuaikan dengan microstep & pitch mekanik Anda
 const uint8_t ACK_OK = 0x01;
 
 GPIO_PinState LIMIT_X_Pressed = GPIO_PIN_SET;
 GPIO_PinState LIMIT_Y_Pressed = GPIO_PIN_SET;
 GPIO_PinState LIMIT_Z_Pressed = GPIO_PIN_SET;
-
-float X_MAX_SPEED = 20833.0f;
-float Y_MAX_SPEED = 20833.0f;
-
-float X_MIN_SPEED = 3000.0f;
-float Y_MIN_SPEED = 3000.0f;
-
-float X_HOMING_MAX_SPEED = 6000.0f;
-float Y_HOMING_MAX_SPEED = 6000.0f;
-
-uint16_t JarakXSetelahHoming = 3200;
-uint16_t JarakYSetelahHoming = 3200;
 
 // =========================================================
 // 2 [OBJEK & PERIPHERAL]
@@ -50,7 +37,8 @@ volatile bool isAborted = false;
 volatile bool ignoreLimitSwitch = false;
 volatile bool flagMintaHoming = false;
 volatile bool isAutoWeldActive = false;
-volatile bool flagManualWeld = false;
+volatile bool flagManualJog = false;
+volatile bool isMachineHomed = false;
 
 // =========================================================
 // [RTOS HANDLES]

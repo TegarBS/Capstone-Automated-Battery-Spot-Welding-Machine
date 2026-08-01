@@ -13,7 +13,7 @@
 #define MAGIC_NUMBER 0xABCD1234      // Kode rahasia penanda Flash valid
 
 // --- FUNGSI MEMBACA DARI FLASH ---
-void Load_Settings_From_Flash() {
+void Load_Settings_From_Flash(void) {
     // Arahkan pointer untuk membaca langsung dari alamat Flash hardware
     PermanentSettings_t *flashData = (PermanentSettings_t*)FLASH_EEPROM_ADDR;
 
@@ -30,13 +30,13 @@ void Load_Settings_From_Flash() {
 }
 
 // --- FUNGSI MENYIMPAN KE FLASH (DENGAN SAFETY INTERLOCK) ---
-bool Save_Settings_To_Flash() {
+bool Save_Settings_To_Flash(void) {
 
     // ==========================================================
     // 1. SAFETY INTERLOCK (PENCEGAHAN CRASH)
     // Jangan izinkan penyimpanan jika mesin sedang melakukan aktivitas kritis!
     // ==========================================================
-    if (isAutoWeldActive || flagManualWeld || flagMintaHoming || isNavigating) {
+    if (isAutoWeldActive || flagManualJog || flagMintaHoming || isNavigating) {
         return false; // TOLAK PERINTAH! Mesin sedang sibuk
     }
 
@@ -82,13 +82,13 @@ bool Save_Settings_To_Flash() {
     return true; // Penyimpanan Berhasil
 }
 
-void salinDataKeRegister(){
+void salinDataKeRegister(void){
 	memcpy(&Holding_Registers[EEPROM_START_MODBUS_REG],
 		   &eepromSettings.stepsPerMmX,
 		   TOTAL_EEPROM_PARAMS * sizeof(uint16_t));
 }
 
-void ambilDataDariRegister(){
+void ambilDataDariRegister(void){
 	eepromSettings.magicNumber = MAGIC_NUMBER;
 
 	// Kopi 26 parameter sekaligus dari Array HMI masuk ke RAM mesin
@@ -97,7 +97,7 @@ void ambilDataDariRegister(){
 		   TOTAL_EEPROM_PARAMS * sizeof(uint16_t));
 }
 
-void loadDefault(){
+void loadDefault(void){
     eepromSettings.magicNumber = MAGIC_NUMBER;
 
     eepromSettings.maxSpeedX = 2000;

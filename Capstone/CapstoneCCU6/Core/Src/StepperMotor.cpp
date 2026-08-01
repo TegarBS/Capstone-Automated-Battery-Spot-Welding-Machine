@@ -25,6 +25,11 @@ StepperMotor::StepperMotor(GPIO_TypeDef* step_port, uint16_t step_pin, GPIO_Type
 
 	minSpeedHz = 0;      // Mulai dari 500 Hz (Sangat halus, bebas getar)
 	maxSpeedHz = 0;    // Target kecepatan puncak (~20 kHz)
+
+    stepsToGo = 0;
+    accelSteps = 0;
+
+    accelHz = 0;
 }
 
 void StepperMotor::setTarget(long target) {
@@ -95,7 +100,7 @@ void StepperMotor::setAccelHz(float accelHz){
 }
 
 // FUNGSI INI BERJALAN 100% DI DALAM INTERUPSI HARDWARE
-void StepperMotor::isr_update() {
+void StepperMotor::isr_update(void) {
     if (!isMoving) return;
 
     // 1. Tembakkan Pulsa STEP
@@ -139,20 +144,20 @@ void StepperMotor::isr_update() {
     __HAL_TIM_SET_AUTORELOAD(htim, nextARR);
 }
 
-void StepperMotor::stop() {
+void StepperMotor::stop(void) {
     HAL_TIM_Base_Stop_IT(htim); // Matikan Timer instan!
     targetPositionPulse = currentPositionPulse;
     isMoving = false;
     state = IDLE_STATE;
 }
 
-void StepperMotor::resetPosition() {
+void StepperMotor::resetPosition(void) {
     currentPositionPulse = 0;
     targetPositionPulse = 0;
     isMoving = false;
     state = IDLE_STATE;
 }
 
-long StepperMotor::getCurrentPositionPulse() {
+long StepperMotor::getCurrentPositionPulse(void) {
     return currentPositionPulse;
 }

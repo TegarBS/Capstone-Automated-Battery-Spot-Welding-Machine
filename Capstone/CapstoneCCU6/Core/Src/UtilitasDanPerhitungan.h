@@ -13,7 +13,7 @@
 // =========================================================
 // [FUNGSI OTAK CAM: PUSAT BATERAI (ZIG-ZAG)]
 // =========================================================
-Koordinat_t CalculateBatteryCenter_mm();
+Koordinat_t CalculateBatteryCenter_mm(void);
 
 /**
  * Mengonversi jarak milimeter (Sumbu X) menjadi jumlah pulsa motor
@@ -28,6 +28,13 @@ long Convert_mm_to_PulseX(float target_mm);
  * @return Jumlah pulsa absolut (32-bit signed integer)
  */
 long Convert_mm_to_PulseY(float target_mm);
+
+/**
+ * Mengonversi jarak milimeter (Sumbu Y) menjadi jumlah pulsa motor
+ * @param target_mm Jarak yang diinginkan dalam milimeter (bisa bernilai negatif)
+ * @return Jumlah pulsa absolut (32-bit signed integer)
+ */
+long Convert_mm_to_PulseZ(float target_mm);
 
 void Update_Motor_Speed_From_Settings(void);
 void Update_Motor_Speed_Homing_From_Settings(void);

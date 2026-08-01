@@ -8,6 +8,7 @@
 
 #include "FungsiEEPROM.h"
 #include "GlobalData.h"
+#include "UtilitasDanPerhitungan.h"
 
 // =========================================================
 // TASK KOMUNIKASI (PARSER MODBUS RTU ZERO-QUEUE)
@@ -85,9 +86,9 @@ void Task_Komunikasi(void *pvParameters) {
 					if (coil_val == 0xFF00) isPaused = true;
 					else isPaused = false;
 				}
-				// COIL 4: TRIGGER MODE MANUAL
+				// COIL 4: TRIGGER MODE MANUAL JOG
 				else if (coil_addr == 0x0004 && coil_val == 0xFF00) {
-					flagManualWeld = true; // Bangunkan Sequencer untuk mode manual
+					flagManualJog = true; // Bangunkan Sequencer untuk mode manual
 				}
                 // COIL 5: TRIGGER SAVE TO FLASH (EEPROM)
 				else if (coil_addr == 0x0005 && coil_val == 0xFF00) {
@@ -153,6 +154,12 @@ void Task_Komunikasi(void *pvParameters) {
                     // Catatan: Reg 4 (Drop Delay) dan Reg 5 (Weld Time) biarkan
                     // tersimpan di Holding_Registers karena dibaca langsung oleh Sequencer
                 }
+
+                if (alamat_offset >= 20) {
+					// Panggil fungsinya di sini! Mesin akan langsung ngebut/melambat
+					// sesuai settingan baru detik itu juga tanpa perlu disuruh Homing.
+					Update_Motor_Speed_From_Settings();
+				}
 
                 vTaskDelay(5);
                 HAL_UART_Transmit(&huart1, rxBuffer, len, 100);

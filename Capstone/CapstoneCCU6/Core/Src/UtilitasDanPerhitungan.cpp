@@ -10,7 +10,7 @@
 // =========================================================
 // [FUNGSI OTAK CAM: PUSAT BATERAI (ZIG-ZAG)]
 // =========================================================
-Koordinat_t CalculateBatteryCenter_mm() {
+Koordinat_t CalculateBatteryCenter_mm(void) {
     Koordinat_t center;
 
     // 1. Hitung Posisi Y (Selalu naik sesuai baris)
@@ -59,6 +59,19 @@ long Convert_mm_to_PulseY(float target_mm) {
     }
 }
 
+/**
+ * Mengonversi jarak milimeter (Sumbu Y) menjadi jumlah pulsa motor
+ * @param target_mm Jarak yang diinginkan dalam milimeter (bisa bernilai negatif)
+ * @return Jumlah pulsa absolut (32-bit signed integer)
+ */
+long Convert_mm_to_PulseZ(float target_mm) {
+    if (target_mm >= 0) {
+        return (long)(target_mm * eepromSettings.stepsPerMmZ + 0.5f);
+    } else {
+        return (long)(target_mm * eepromSettings.stepsPerMmZ - 0.5f);
+    }
+}
+
 // =========================================================
 // [FUNGSI UTILITAS: UPDATE PROFIL KECEPATAN DARI EEPROM]
 // Dipanggil 1x setelah booting, atau setiap kali HMI menekan "SAVE"
@@ -85,6 +98,17 @@ void Update_Motor_Speed_From_Settings(void) {
     motorY->setMaxSpeedHz(calc_maxY_Hz);
     motorY->setMinSpeedHz(calc_minY_Hz);
     motorY->setAccelHz(calc_accelY_Hz);
+
+    // ---------------------------------------------------------
+    // 3. UPDATE PROFIL MOTOR Z (Kalkulasi Hz independen)
+    // ---------------------------------------------------------
+    float calc_maxZ_Hz   = (float)eepromSettings.maxSpeedZ * eepromSettings.stepsPerMmZ / 60.0f;
+    float calc_minZ_Hz   = (float)eepromSettings.minSpeedZ * eepromSettings.stepsPerMmZ / 60.0f;
+    float calc_accelZ_Hz = (float)eepromSettings.accelZ * eepromSettings.stepsPerMmZ;
+
+    motorZ->setMaxSpeedHz(calc_maxZ_Hz);
+    motorZ->setMinSpeedHz(calc_minZ_Hz);
+    motorZ->setAccelHz(calc_accelZ_Hz);
 
     motorX->setInvertDirection(eepromSettings.directionX != 0);
 	motorY->setInvertDirection(eepromSettings.directionY != 0);
@@ -116,5 +140,4 @@ void Update_Motor_Speed_Homing_From_Settings(void) {
 
     motorX->setInvertDirection(eepromSettings.directionX != 0);
 	motorY->setInvertDirection(eepromSettings.directionY != 0);
-	motorZ->setInvertDirection(eepromSettings.directionZ != 0);
 }

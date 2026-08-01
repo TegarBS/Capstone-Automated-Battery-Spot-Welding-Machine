@@ -53,11 +53,11 @@ public:
 	void setAccelHz(float accelHz);
 
     // Fungsi ini BUKAN dipanggil dari loop, tapi langsung oleh Interupsi Timer!
-    void isr_update();
+    void isr_update(void);
 
-    void stop();
-    void resetPosition();
-    long getCurrentPositionPulse();
+    void stop(void);
+    void resetPosition(void);
+    long getCurrentPositionPulse(void);
 };
 
 #endif /* SRC_STEPPERMOTOR_H_ */
