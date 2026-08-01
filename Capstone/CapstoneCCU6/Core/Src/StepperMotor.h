@@ -43,7 +43,7 @@ public:
     bool isMoving;
 
     // Constructor kini meminta input Hardware Timer
-    StepperMotor(GPIO_TypeDef* step_port, uint16_t step_pin, GPIO_TypeDef* dir_port, uint16_t dir_pin, TIM_HandleTypeDef* timer, float MIN_SPEED, float MAX_SPEED);
+    StepperMotor(GPIO_TypeDef* step_port, uint16_t step_pin, GPIO_TypeDef* dir_port, uint16_t dir_pin, TIM_HandleTypeDef* timer);
 
     void setTarget(long target);
     void setInvertDirection(bool invert);

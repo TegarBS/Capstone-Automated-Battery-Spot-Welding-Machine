@@ -86,23 +86,10 @@ typedef struct {
     float pitchY;
 } MesinConfig_t;
 
-extern const float STEPS_PER_MM;
 extern const uint8_t ACK_OK;
 
 extern GPIO_PinState LIMIT_X_Pressed;
 extern GPIO_PinState LIMIT_Y_Pressed;
-
-extern float X_MAX_SPEED;
-extern float Y_MAX_SPEED;
-
-extern float X_MIN_SPEED;
-extern float Y_MIN_SPEED;
-
-extern float X_HOMING_MAX_SPEED;
-extern float Y_HOMING_MAX_SPEED;
-
-extern uint16_t JarakXSetelahHoming;
-extern uint16_t JarakYSetelahHoming;
 
 // =========================================================
 // 2 [OBJEK & PERIPHERAL]
