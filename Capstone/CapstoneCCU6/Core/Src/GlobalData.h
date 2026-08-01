@@ -90,12 +90,14 @@ extern const uint8_t ACK_OK;
 
 extern GPIO_PinState LIMIT_X_Pressed;
 extern GPIO_PinState LIMIT_Y_Pressed;
+extern GPIO_PinState LIMIT_Z_Pressed;
 
 // =========================================================
 // 2 [OBJEK & PERIPHERAL]
 // =========================================================
 extern StepperMotor* motorX;
 extern StepperMotor* motorY;
+extern StepperMotor* motorZ;
 
 // =========================================================
 // 3 [BENDERA KONTROL MESIN (STATE MACHINE)]
@@ -139,5 +141,6 @@ extern uint16_t indexBarisAktual;
 extern UART_HandleTypeDef huart1;
 extern TIM_HandleTypeDef htim2;
 extern TIM_HandleTypeDef htim3;
+extern TIM_HandleTypeDef htim4;
 
 #endif /* SRC_GLOBALDATA_H_ */

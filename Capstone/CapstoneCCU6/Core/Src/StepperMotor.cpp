@@ -94,9 +94,6 @@ void StepperMotor::setAccelHz(float accelHz){
 	this->accelHz = accelHz;
 }
 
-void setMinSpeed(float minFreq);
-void setAccel(float accelFreq);
-
 // FUNGSI INI BERJALAN 100% DI DALAM INTERUPSI HARDWARE
 void StepperMotor::isr_update() {
     if (!isMoving) return;

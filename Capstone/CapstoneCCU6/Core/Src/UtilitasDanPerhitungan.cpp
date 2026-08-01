@@ -85,6 +85,10 @@ void Update_Motor_Speed_From_Settings(void) {
     motorY->setMaxSpeedHz(calc_maxY_Hz);
     motorY->setMinSpeedHz(calc_minY_Hz);
     motorY->setAccelHz(calc_accelY_Hz);
+
+    motorX->setInvertDirection(eepromSettings.directionX != 0);
+	motorY->setInvertDirection(eepromSettings.directionY != 0);
+	motorZ->setInvertDirection(eepromSettings.directionZ != 0);
 }
 
 void Update_Motor_Speed_Homing_From_Settings(void) {
@@ -109,4 +113,8 @@ void Update_Motor_Speed_Homing_From_Settings(void) {
     motorY->setMaxSpeedHz(calc_maxY_Hz);
     motorY->setMinSpeedHz(calc_minY_Hz);
     motorY->setAccelHz(calc_accelY_Hz);
+
+    motorX->setInvertDirection(eepromSettings.directionX != 0);
+	motorY->setInvertDirection(eepromSettings.directionY != 0);
+	motorZ->setInvertDirection(eepromSettings.directionZ != 0);
 }

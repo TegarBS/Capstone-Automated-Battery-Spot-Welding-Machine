@@ -28,6 +28,7 @@ void Task_Monitor(void *pvParameters);
 void MachineApp_Init(void) {
     motorX = new StepperMotor(STEP_X_GPIO_Port, STEP_X_Pin, DIR_X_GPIO_Port, DIR_X_Pin, &htim2);
     motorY = new StepperMotor(STEP_Y_GPIO_Port, STEP_Y_Pin, DIR_Y_GPIO_Port, DIR_Y_Pin, &htim3);
+    motorZ = new StepperMotor(STEP_Z_GPIO_Port, STEP_Z_Pin, DIR_Z_GPIO_Port, DIR_Z_Pin, &htim4);
 
     //Motor X terbalik
     motorX->setInvertDirection(true);

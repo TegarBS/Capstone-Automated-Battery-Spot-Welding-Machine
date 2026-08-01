@@ -20,6 +20,7 @@ const uint8_t ACK_OK = 0x01;
 
 GPIO_PinState LIMIT_X_Pressed = GPIO_PIN_SET;
 GPIO_PinState LIMIT_Y_Pressed = GPIO_PIN_SET;
+GPIO_PinState LIMIT_Z_Pressed = GPIO_PIN_SET;
 
 float X_MAX_SPEED = 20833.0f;
 float Y_MAX_SPEED = 20833.0f;
@@ -38,6 +39,7 @@ uint16_t JarakYSetelahHoming = 3200;
 // =========================================================
 StepperMotor* motorX = NULL;
 StepperMotor* motorY = NULL;
+StepperMotor* motorZ = NULL;
 
 // =========================================================
 // 3 [BENDERA KONTROL MESIN (STATE MACHINE)]
