@@ -100,8 +100,46 @@ void ambilDataDariRegister(){
 void loadDefault(){
     eepromSettings.magicNumber = MAGIC_NUMBER;
 
-    eepromSettings.stepsPerMmX = 160;
-    eepromSettings.stepsPerMmY = 160;
     eepromSettings.maxSpeedX = 2000;
     eepromSettings.accelX = 500;
+
+    eepromSettings.stepsPerMmX = 160;
+    eepromSettings.stepsPerMmY = 160;
+    eepromSettings.stepsPerMmZ = 800;
+
+    //Speed in mm/s
+    eepromSettings.maxSpeedX = 7500;
+    eepromSettings.maxSpeedY = 7500;
+    eepromSettings.maxSpeedZ = 500;
+
+    eepromSettings.minSpeedX = 500;
+    eepromSettings.minSpeedY = 500;
+    eepromSettings.minSpeedZ = 400;
+
+    //Acceleration in mm/s^2
+    eepromSettings.accelX = 1000;
+    eepromSettings.accelY = 1000;
+    eepromSettings.accelZ = 50;
+
+    //Max travel in mm
+    eepromSettings.maxTravelX = 200;
+    eepromSettings.maxTravelY = 200;
+    eepromSettings.maxTravelZ = 50;
+
+    //Speed in mm/s
+    eepromSettings.maxSpeedHomingX = 1500;
+    eepromSettings.maxSpeedHomingY = 1500;
+    eepromSettings.maxSpeedHomingZ = 500;
+
+    //Travel in mm
+    eepromSettings.homingTravelAfterLimitX = 20;
+    eepromSettings.homingTravelAfterLimitY = 20;
+    eepromSettings.homingTravelAfterLimitZ = 20;
+
+    eepromSettings.directionX = 1;
+    eepromSettings.directionY = 0;
+    eepromSettings.directionZ = 0;
+
+    eepromSettings.weldCount = 2;
+    eepromSettings.spotSpacing_x10 = 15;
 }
