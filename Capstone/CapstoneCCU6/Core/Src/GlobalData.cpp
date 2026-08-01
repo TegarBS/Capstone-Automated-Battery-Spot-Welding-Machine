@@ -59,10 +59,10 @@ SemaphoreHandle_t Sem_DataDiterima;
 // =========================================================
 // [Modbus Communication]
 // =========================================================
-uint16_t Holding_Registers[40] = {0}; // Alamat 40001 - 40010
-uint16_t Input_Registers[10]   = {0};
-uint8_t Coils[10]              = {0};
-uint8_t Discrete_Input[10]     = {0};
+uint16_t Holding_Registers[TOTAL_HOLDING_REGISTERS]	 = {0}; // Alamat 40001 - 40010
+uint16_t Input_Registers[TOTAL_INPUT_REGISTER]  	 = {0};
+uint8_t Coils[TOTAL_COILS]              		     = {0};
+uint8_t Discrete_Input[TOTAL_DISCRETE_INPUT]  	     = {0};
 
 uint8_t rxChar;
 uint8_t rxBuffer[32]; // Diperbesar sedikit untuk Modbus

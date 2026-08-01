@@ -85,21 +85,21 @@ void loadDefault(){
     eepromSettings.magicNumber = MAGIC_NUMBER;
     eepromSettings.stepsPerMmX = 160;
     eepromSettings.stepsPerMmY = 160;
-    eepromSettings.maxSpeed = 2000;
-    eepromSettings.accelSpeed = 500;
+    eepromSettings.maxSpeedX = 2000;
+    eepromSettings.accelX = 500;
 }
 
 void salinDataKeRegister(){
     Holding_Registers[10] = eepromSettings.stepsPerMmX;
     Holding_Registers[11] = eepromSettings.stepsPerMmY;
-    Holding_Registers[12] = eepromSettings.maxSpeed;
-    Holding_Registers[13] = eepromSettings.accelSpeed;
+//    Holding_Registers[12] = eepromSettings.maxSpeed;
+//    Holding_Registers[13] = eepromSettings.accelSpeed;
 }
 
 void ambilDataDariRegister(){
     eepromSettings.magicNumber = MAGIC_NUMBER;
     eepromSettings.stepsPerMmX = Holding_Registers[10];
     eepromSettings.stepsPerMmY = Holding_Registers[11];
-    eepromSettings.maxSpeed    = Holding_Registers[12];
-    eepromSettings.accelSpeed  = Holding_Registers[13];
+//    eepromSettings.maxSpeed    = Holding_Registers[12];
+//    eepromSettings.accelSpeed  = Holding_Registers[13];
 }

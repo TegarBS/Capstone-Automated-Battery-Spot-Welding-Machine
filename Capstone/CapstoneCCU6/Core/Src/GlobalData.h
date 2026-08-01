@@ -13,52 +13,56 @@
 #include "semphr.h"
 #include "StepperMotor.h"
 
+#define TOTAL_HOLDING_REGISTERS 70
+#define TOTAL_INPUT_REGISTER 10
+#define TOTAL_COILS 10
+#define TOTAL_DISCRETE_INPUT 10
+
 // =========================================================
 // [STRUCT PARAMETER PERMANEN (EEPROM)]
 // =========================================================
 typedef struct {
     uint32_t magicNumber; // Penanda apakah Flash sudah pernah diisi atau masih kosong
+
     uint16_t stepsPerMmX;
     uint16_t stepsPerMmY;
-    uint16_t maxSpeed;
-    uint16_t accelSpeed;
+    uint16_t stepsPerMmZ;
+
+    //Speed in mm/s
+    uint16_t maxSpeedX;
+    uint16_t maxSpeedY;
+    uint16_t maxSpeedZ;
+
+    uint16_t minSpeedX;
+    uint16_t minSpeedY;
+    uint16_t minSpeedZ;
+
+    //Acceleration in mm/s^2
+    uint16_t accelX;
+    uint16_t accelY;
+    uint16_t accelZ;
+
+    //Max travel in mm
+    uint16_t maxTravelX;
+    uint16_t maxTravelY;
+    uint16_t maxTravelZ;
+
+    //Speed in mm/s
+    uint16_t maxSpeedHomingX;
+    uint16_t maxSpeedHomingY;
+    uint16_t maxSpeedHomingZ;
+
+    //Travel in mm
+    uint16_t homingTravelAfterLimitX;
+    uint16_t homingTravelAfterLimitY;
+    uint16_t homingTravelAfterLimitZ;
+
+    uint16_t directionX;
+    uint16_t directionY;
+    uint16_t directionZ;
+
     uint16_t weldCount;
-    uint16_t spotSpacing_x10;
-
-    uint16_t STEP_PER_MM_X;
-    uint16_t STEP_PER_MM_Y;
-    uint16_t STEP_PER_MM_Z;
-
-    uint16_t SPEED_MAX_X;
-    uint16_t SPEED_MAX_Y;
-    uint16_t SPEED_MAX_Z;
-
-    uint16_t SPEED_MIN_X;
-    uint16_t SPEED_MIN_Y;
-    uint16_t SPEED_MIN_Z;
-
-    uint16_t ACCEL_X;
-    uint16_t ACCEL_Y;
-    uint16_t ACCEL_Z;
-
-    uint16_t TRAVEL_MAX_X;
-    uint16_t TRAVEL_MAX_Y;
-    uint16_t TRAVEL_MAX_Z;
-
-    uint16_t HOMING_SPEED_MAX_X;
-    uint16_t HOMING_SPEED_MAX_Y;
-    uint16_t HOMING_SPEED_MAX_Z;
-
-    uint16_t HOMING_TRAVEL_AFTER_LIMIT_X;
-    uint16_t HOMING_TRAVEL_AFTER_LIMIT_Y;
-    uint16_t HOMING_TRAVEL_AFTER_LIMIT_Z;
-
-    uint16_t DIRECTION_X;
-    uint16_t DIRECTION_Y;
-    uint16_t DIRECTION_Z;
-
-    uint16_t WELD_COUNT;
-    uint16_t SPOT_SPACING_X10; //Jika ingin jarak 2.0mm, data dikirim bernilai 20
+    uint16_t spotSpacing_x10; //Jika ingin jarak 2.0mm, data dikirim bernilai 20
 
 } PermanentSettings_t;
 
@@ -123,10 +127,10 @@ extern SemaphoreHandle_t Sem_DataDiterima;
 // =========================================================
 // [Modbus Communication]
 // =========================================================
-extern uint16_t Holding_Registers[40]; // Alamat 40001 - 40040
-extern uint16_t Input_Registers[10];
-extern uint8_t Coils[10];
-extern uint8_t Discrete_Input[10];
+extern uint16_t Holding_Registers[TOTAL_HOLDING_REGISTERS]; // Alamat 40001 - 40040
+extern uint16_t Input_Registers[TOTAL_INPUT_REGISTER];
+extern uint8_t Coils[TOTAL_COILS];
+extern uint8_t Discrete_Input[TOTAL_DISCRETE_INPUT];
 
 extern uint8_t rxChar;
 extern uint8_t rxBuffer[32]; // Diperbesar sedikit untuk Modbus

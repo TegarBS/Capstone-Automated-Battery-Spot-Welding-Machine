@@ -29,4 +29,7 @@ long Convert_mm_to_PulseX(float target_mm);
  */
 long Convert_mm_to_PulseY(float target_mm);
 
+void Update_Motor_Speed_From_Settings(void);
+void Update_Motor_Speed_Homing_From_Settings(void);
+
 #endif /* SRC_UTILITASDANPERHITUNGAN_H_ */

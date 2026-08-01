@@ -68,8 +68,7 @@ void Task_Sequencer(void *pvParameters) {
         // =========================================================
         if (flagMintaHoming) {
 
-			motorX->setMaxSpeed(X_HOMING_MAX_SPEED);
-			motorY->setMaxSpeed(Y_HOMING_MAX_SPEED);
+        	Update_Motor_Speed_Homing_From_Settings();
 
 			// --- TAHAP 1: SEEK (Mencari Limit Switch dengan Pre-Flight Check) ---
 			isNavigating = true;
@@ -117,8 +116,7 @@ void Task_Sequencer(void *pvParameters) {
 			motorX->resetPosition();
 			motorY->resetPosition();
 
-			motorX->setMaxSpeed(20833.0f);
-			motorY->setMaxSpeed(20833.0f);
+			Update_Motor_Speed_From_Settings();
 
             flagMintaHoming = false; // Matikan flag setelah selesai
             continue; // Ulangi loop
@@ -328,6 +326,12 @@ extern "C" void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 }
 
 
+
+/**
+ * Task monitoring lokasi real-time
+ * Blinking LED untuk monitor kondisi STM32
+ *
+ */
 void Task_Monitor(void *pvParameters) {
     uint32_t counter_led = 0;
 

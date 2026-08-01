@@ -23,18 +23,21 @@ private:
     long targetPositionPulse;
     bool invertDir;
 
+    uint32_t timerClock; // Kecepatan clock timer
+
     // --- Variabel Dynamic ARR (Akselerasi Trapesium) ---
     MotionState state;
     long stepsToGo;
     long accelSteps;
 
-    // Hapus variabel minARR, startARR, currentARR, arrDelta
-    // Ganti menjadi:
-    float minFreq;       // Frekuensi awal saat motor mulai bergerak (misal: 500 Hz)
-    float maxFreq;       // Frekuensi puncak / cruising (misal: 20000 Hz)
-    float currentFreq;   // Frekuensi aktual saat ini
-    float freqDelta;     // Lonjakan frekuensi per langkah
-    uint32_t timerClock; // Kecepatan clock timer (misal: 4000000)
+    // --- Variabel Pergerakan ---
+    float minSpeedHz;       // Frekuensi awal saat motor mulai bergerak
+    float maxSpeedHz;       // Frekuensi puncak / cruising
+    float currentSpeedHz;   // Frekuensi aktual saat ini
+    float deltaSpeedHz;    	// Lonjakan frekuensi per langkah
+    
+    float accelHz;
+
 
 public:
     bool isMoving;
@@ -44,7 +47,10 @@ public:
 
     void setTarget(long target);
     void setInvertDirection(bool invert);
-    void setMaxSpeed(float newMaxFreq);
+
+	void setMinSpeedHz(float minSpeedHz);
+    void setMaxSpeedHz(float maxSpeedHz);
+	void setAccelHz(float accelHz);
 
     // Fungsi ini BUKAN dipanggil dari loop, tapi langsung oleh Interupsi Timer!
     void isr_update();

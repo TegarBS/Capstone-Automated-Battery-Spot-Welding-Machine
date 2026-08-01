@@ -111,6 +111,23 @@ void Task_Komunikasi(void *pvParameters) {
 					}
 				}
 
+                // -----------------------------------------------------
+				// COIL 6: RESET SYSTEM (REBOOT MCU)
+				// -----------------------------------------------------
+				else if (coil_addr == 0x0006 && coil_val == 0xFF00) {
+
+					// 1. ECHO (BALAS) KE HMI TERLEBIH DAHULU!
+					// Ini wajib agar HMI Python menerima jawaban "OK" dan tidak terkena Timeout Error.
+					HAL_UART_Transmit(&huart1, rxBuffer, len, 100);
+
+					// 2. Beri waktu sebentar (50ms) agar sinyal UART benar-benar selesai terkirim dari kabel
+					vTaskDelay(pdMS_TO_TICKS(50));
+
+					// 3. TARIK PELATUK RESET!
+					// Perintah ini akan langsung mematikan dan menghidupkan ulang seluruh sistem STM32
+					NVIC_SystemReset();
+				}
+
                 // Echo balik ke Master (HMI) tanda sukses
                 vTaskDelay(5);
                 HAL_UART_Transmit(&huart1, rxBuffer, len, 100);
@@ -123,7 +140,7 @@ void Task_Komunikasi(void *pvParameters) {
                 uint16_t alamat_offset = (rxBuffer[2] << 8) | rxBuffer[3];
                 uint16_t data_baru     = (rxBuffer[4] << 8) | rxBuffer[5];
 
-                if (alamat_offset < 10) {
+                if (alamat_offset < TOTAL_HOLDING_REGISTERS) {
                     Holding_Registers[alamat_offset] = data_baru;
 
                     // MENGISI "OTAK" MESIN (Sinkronisasi ke configLas)
