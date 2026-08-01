@@ -7,6 +7,7 @@
 
 #include "FungsiEEPROM.h"
 #include "GlobalData.h"
+#include <string.h>
 
 #define FLASH_EEPROM_ADDR 0x08020000 // Alamat awal Sektor 5 di STM32F401
 #define MAGIC_NUMBER 0xABCD1234      // Kode rahasia penanda Flash valid
@@ -81,25 +82,26 @@ bool Save_Settings_To_Flash() {
     return true; // Penyimpanan Berhasil
 }
 
+void salinDataKeRegister(){
+	memcpy(&Holding_Registers[EEPROM_START_MODBUS_REG],
+		   &eepromSettings.stepsPerMmX,
+		   TOTAL_EEPROM_PARAMS * sizeof(uint16_t));
+}
+
+void ambilDataDariRegister(){
+	eepromSettings.magicNumber = MAGIC_NUMBER;
+
+	// Kopi 26 parameter sekaligus dari Array HMI masuk ke RAM mesin
+	memcpy(&eepromSettings.stepsPerMmX,
+		   &Holding_Registers[EEPROM_START_MODBUS_REG],
+		   TOTAL_EEPROM_PARAMS * sizeof(uint16_t));
+}
+
 void loadDefault(){
     eepromSettings.magicNumber = MAGIC_NUMBER;
+
     eepromSettings.stepsPerMmX = 160;
     eepromSettings.stepsPerMmY = 160;
     eepromSettings.maxSpeedX = 2000;
     eepromSettings.accelX = 500;
-}
-
-void salinDataKeRegister(){
-    Holding_Registers[10] = eepromSettings.stepsPerMmX;
-    Holding_Registers[11] = eepromSettings.stepsPerMmY;
-//    Holding_Registers[12] = eepromSettings.maxSpeed;
-//    Holding_Registers[13] = eepromSettings.accelSpeed;
-}
-
-void ambilDataDariRegister(){
-    eepromSettings.magicNumber = MAGIC_NUMBER;
-    eepromSettings.stepsPerMmX = Holding_Registers[10];
-    eepromSettings.stepsPerMmY = Holding_Registers[11];
-//    eepromSettings.maxSpeed    = Holding_Registers[12];
-//    eepromSettings.accelSpeed  = Holding_Registers[13];
 }

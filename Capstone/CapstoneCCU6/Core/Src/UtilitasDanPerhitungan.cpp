@@ -67,8 +67,8 @@ void Update_Motor_Speed_From_Settings(void) {
     // ---------------------------------------------------------
     // 1. UPDATE PROFIL MOTOR X (Kalkulasi Hz independen)
     // ---------------------------------------------------------
-    float calc_maxX_Hz   = (float)eepromSettings.maxSpeedX * eepromSettings.stepsPerMmX;
-    float calc_minX_Hz   = (float)eepromSettings.minSpeedX * eepromSettings.stepsPerMmX;
+    float calc_maxX_Hz   = (float)eepromSettings.maxSpeedX * eepromSettings.stepsPerMmX / 60.0f;
+    float calc_minX_Hz   = (float)eepromSettings.minSpeedX * eepromSettings.stepsPerMmX / 60.0f;
     float calc_accelX_Hz = (float)eepromSettings.accelX * eepromSettings.stepsPerMmX;
 
     motorX->setMaxSpeedHz(calc_maxX_Hz);
@@ -78,8 +78,8 @@ void Update_Motor_Speed_From_Settings(void) {
     // ---------------------------------------------------------
     // 2. UPDATE PROFIL MOTOR Y (Kalkulasi Hz independen)
     // ---------------------------------------------------------
-    float calc_maxY_Hz   = (float)eepromSettings.maxSpeedY * eepromSettings.stepsPerMmY;
-    float calc_minY_Hz   = (float)eepromSettings.minSpeedY * eepromSettings.stepsPerMmY;
+    float calc_maxY_Hz   = (float)eepromSettings.maxSpeedY * eepromSettings.stepsPerMmY / 60.0f;
+    float calc_minY_Hz   = (float)eepromSettings.minSpeedY * eepromSettings.stepsPerMmY / 60.0f;
     float calc_accelY_Hz = (float)eepromSettings.accelY * eepromSettings.stepsPerMmY;
 
     motorY->setMaxSpeedHz(calc_maxY_Hz);
@@ -91,8 +91,8 @@ void Update_Motor_Speed_Homing_From_Settings(void) {
     // ---------------------------------------------------------
     // 1. UPDATE PROFIL MOTOR X (Kalkulasi Hz independen)
     // ---------------------------------------------------------
-    float calc_maxX_Hz   = (float)eepromSettings.maxSpeedHomingX * eepromSettings.stepsPerMmX;
-    float calc_minX_Hz   = (float)eepromSettings.minSpeedX * eepromSettings.stepsPerMmX;
+    float calc_maxX_Hz   = (float)eepromSettings.maxSpeedHomingX * eepromSettings.stepsPerMmX / 60.0f;
+    float calc_minX_Hz   = (float)eepromSettings.minSpeedX * eepromSettings.stepsPerMmX / 60.0f;
     float calc_accelX_Hz = (float)eepromSettings.accelX * eepromSettings.stepsPerMmX;
 
     motorX->setMaxSpeedHz(calc_maxX_Hz);
@@ -102,8 +102,8 @@ void Update_Motor_Speed_Homing_From_Settings(void) {
     // ---------------------------------------------------------
     // 2. UPDATE PROFIL MOTOR Y (Kalkulasi Hz independen)
     // ---------------------------------------------------------
-    float calc_maxY_Hz   = (float)eepromSettings.maxSpeedHomingY * eepromSettings.stepsPerMmY;
-    float calc_minY_Hz   = (float)eepromSettings.minSpeedY * eepromSettings.stepsPerMmY;
+    float calc_maxY_Hz   = (float)eepromSettings.maxSpeedHomingY * eepromSettings.stepsPerMmY / 60.0f;
+    float calc_minY_Hz   = (float)eepromSettings.minSpeedY * eepromSettings.stepsPerMmY / 60.0f;
     float calc_accelY_Hz = (float)eepromSettings.accelY * eepromSettings.stepsPerMmY;
 
     motorY->setMaxSpeedHz(calc_maxY_Hz);

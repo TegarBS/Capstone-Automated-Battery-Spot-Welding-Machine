@@ -68,6 +68,9 @@ typedef struct {
 
 extern PermanentSettings_t eepromSettings;
 
+#define EEPROM_START_MODBUS_REG 20
+#define TOTAL_EEPROM_PARAMS 26
+
 // =========================================================
 // 1 [STRUCT & KONSTANTA]
 // =========================================================
