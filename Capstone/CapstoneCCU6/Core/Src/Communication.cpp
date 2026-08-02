@@ -156,8 +156,7 @@ void Task_Komunikasi(void *pvParameters) {
                 }
 
                 if (alamat_offset >= 20) {
-					// Panggil fungsinya di sini! Mesin akan langsung ngebut/melambat
-					// sesuai settingan baru detik itu juga tanpa perlu disuruh Homing.
+					// Update motor jika ada perubahan konfigurasi
 					Update_Motor_Speed_From_Settings();
 				}
 
@@ -188,6 +187,7 @@ void Task_Komunikasi(void *pvParameters) {
 // =========================================================
 // CALLBACK INTERUPSI UART (HARDWARE ISR)
 // =========================================================
+// cppcheck-suppress constParameterPointer
 extern "C" void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
     if (huart->Instance == USART1) {
 
@@ -214,7 +214,7 @@ extern "C" void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 // =========================================================
 // FUNGSI MATEMATIKA CRC16 MODBUS
 // =========================================================
-uint16_t Hitung_CRC16(uint8_t *nData, uint16_t wLength) {
+uint16_t Hitung_CRC16(const uint8_t *nData, uint16_t wLength) {
     uint16_t wCRC = 0xFFFF;
     for (uint16_t i = 0; i < wLength; i++) {
         wCRC ^= (uint16_t)nData[i];

@@ -9,7 +9,7 @@ extern "C" {
 
 // Fungsi Task & Kalkulasi Modbus
 void Task_Komunikasi(void *pvParameters);
-uint16_t Hitung_CRC16(uint8_t *nData, uint16_t wLength);
+uint16_t Hitung_CRC16(const uint8_t *nData, uint16_t wLength);
 
 #ifdef __cplusplus
 }

@@ -30,6 +30,9 @@ StepperMotor::StepperMotor(GPIO_TypeDef* step_port, uint16_t step_pin, GPIO_Type
     accelSteps = 0;
 
     accelHz = 0;
+
+    currentSpeedHz = 0;   // Frekuensi aktual saat ini
+    deltaSpeedHz = 0;    	// Lonjakan frekuensi per langkah
 }
 
 void StepperMotor::setTarget(long target) {
@@ -86,17 +89,17 @@ void StepperMotor::setInvertDirection(bool invert) {
 }
 
 
-void StepperMotor::setMinSpeedHz(float minSpeedHz){
-	this->minSpeedHz = minSpeedHz;
+void StepperMotor::setMinSpeedHz(float inputMinSpeedHz){
+	this->minSpeedHz = inputMinSpeedHz;
 }
 
 // Mengubah kecepatan puncak secara dinamis (on-the-fly)
-void StepperMotor::setMaxSpeedHz(float maxSpeedHz){
-	this->maxSpeedHz = maxSpeedHz;
+void StepperMotor::setMaxSpeedHz(float inputMaxSpeedHz){
+	this->maxSpeedHz = inputMaxSpeedHz;
 }
 
-void StepperMotor::setAccelHz(float accelHz){
-	this->accelHz = accelHz;
+void StepperMotor::setAccelHz(float inputAccelHz){
+	this->accelHz = inputAccelHz;
 }
 
 // FUNGSI INI BERJALAN 100% DI DALAM INTERUPSI HARDWARE

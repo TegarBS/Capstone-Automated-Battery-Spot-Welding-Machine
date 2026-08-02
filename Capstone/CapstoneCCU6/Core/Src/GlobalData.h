@@ -21,7 +21,7 @@
 // =========================================================
 // [STRUCT PARAMETER PERMANEN (EEPROM)]
 // =========================================================
-typedef struct {
+typedef struct __attribute__((aligned(4))){
     uint32_t magicNumber; // Penanda apakah Flash sudah pernah diisi atau masih kosong
 
     uint16_t stepsPerMmX;

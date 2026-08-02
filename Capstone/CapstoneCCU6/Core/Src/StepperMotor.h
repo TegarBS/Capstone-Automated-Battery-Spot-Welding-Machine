@@ -48,9 +48,9 @@ public:
     void setTarget(long target);
     void setInvertDirection(bool invert);
 
-	void setMinSpeedHz(float minSpeedHz);
-    void setMaxSpeedHz(float maxSpeedHz);
-	void setAccelHz(float accelHz);
+	void setMinSpeedHz(float inputMinSpeedHz);
+    void setMaxSpeedHz(float inputMaxSpeedHz);
+	void setAccelHz(float inputAccelHz);
 
     // Fungsi ini BUKAN dipanggil dari loop, tapi langsung oleh Interupsi Timer!
     void isr_update(void);

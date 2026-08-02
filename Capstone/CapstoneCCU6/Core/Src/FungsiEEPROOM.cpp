@@ -15,7 +15,7 @@
 // --- FUNGSI MEMBACA DARI FLASH ---
 void Load_Settings_From_Flash(void) {
     // Arahkan pointer untuk membaca langsung dari alamat Flash hardware
-    PermanentSettings_t *flashData = (PermanentSettings_t*)FLASH_EEPROM_ADDR;
+    const PermanentSettings_t *flashData = (const PermanentSettings_t*)FLASH_EEPROM_ADDR;
 
     if (flashData->magicNumber == MAGIC_NUMBER) {
         // Jika kode cocok, copy isi Flash ke RAM
@@ -65,7 +65,7 @@ bool Save_Settings_To_Flash(void) {
     HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError);
 
     // 6. Tulis ulang data Struct ke Flash (Kata per Kata / 32-bit)
-    uint32_t *pRamData = (uint32_t*)&eepromSettings;
+    const uint32_t *pRamData = reinterpret_cast<const uint32_t*>(&eepromSettings);
     uint32_t wordsToWrite = sizeof(PermanentSettings_t) / 4;
     if (sizeof(PermanentSettings_t) % 4 != 0) wordsToWrite++;
 
@@ -99,9 +99,6 @@ void ambilDataDariRegister(void){
 
 void loadDefault(void){
     eepromSettings.magicNumber = MAGIC_NUMBER;
-
-    eepromSettings.maxSpeedX = 2000;
-    eepromSettings.accelX = 500;
 
     eepromSettings.stepsPerMmX = 160;
     eepromSettings.stepsPerMmY = 160;
