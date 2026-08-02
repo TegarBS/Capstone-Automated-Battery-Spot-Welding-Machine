@@ -47,7 +47,7 @@ public:
     // Constructor kini meminta input Hardware Timer
     StepperMotor(GPIO_TypeDef* step_port, uint16_t step_pin, GPIO_TypeDef* dir_port, uint16_t dir_pin, TIM_HandleTypeDef* timer);
 
-    void setTarget(long target);
+    void setTargetPulse(long target);
     void setInvertDirection(bool invert);
 
 	void setMinSpeedHz(float inputMinSpeedHz);

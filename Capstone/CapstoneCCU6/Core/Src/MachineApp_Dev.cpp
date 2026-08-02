@@ -79,14 +79,14 @@ void Task_Sequencer(void *pvParameters) {
 			if (HAL_GPIO_ReadPin(LIMIT_X_GPIO_Port, LIMIT_X_Pin) == LIMIT_X_Pressed) {
 				motorX->stop();
 			} else {
-				motorX->setTarget(-999999);
+				motorX->setTargetPulse(-999999);
 			}
 
 			// Cek Sumbu Y: Jika sudah tertekan dari awal, stop. Jika belum, mundur.
 			if (HAL_GPIO_ReadPin(LIMIT_Y_GPIO_Port, LIMIT_Y_Pin) == LIMIT_Y_Pressed) {
 				motorY->stop();
 			} else {
-				motorY->setTarget(-999999);
+				motorY->setTargetPulse(-999999);
 			}
 
 			// Tunggu Semaphore HANYA JIKA ada motor yang benar-benar bergerak
@@ -104,8 +104,8 @@ void Task_Sequencer(void *pvParameters) {
 			isNavigating = true;
 
 			// Maju sejauh 3200 step (Sesuaikan angkanya jika dirasa kurang jauh)
-			motorX->setTarget(Convert_mm_to_PulseX(eepromSettings.homingTravelAfterLimitX));
-			motorY->setTarget(Convert_mm_to_PulseY(eepromSettings.homingTravelAfterLimitY));
+			motorX->setTargetPulse(Convert_mm_to_PulseX(eepromSettings.homingTravelAfterLimitX));
+			motorY->setTargetPulse(Convert_mm_to_PulseY(eepromSettings.homingTravelAfterLimitY));
 
 			// Tunggu sampai motor selesai maju
 			xSemaphoreTake(SinyalPosisiTercapai, portMAX_DELAY);
@@ -172,8 +172,8 @@ void Task_Sequencer(void *pvParameters) {
 				long targetPulseY = Convert_mm_to_PulseY(center.y + offsetY_mm);
 
 				isNavigating = true;
-				motorX->setTarget(targetPulseX);
-				motorY->setTarget(targetPulseY);
+				motorX->setTargetPulse(targetPulseX);
+				motorY->setTargetPulse(targetPulseY);
 
 				if (motorX->isMoving() || motorY->isMoving()) {
 					xSemaphoreTake(SinyalPosisiTercapai, portMAX_DELAY);
@@ -216,33 +216,49 @@ void Task_Sequencer(void *pvParameters) {
 
         } else if (flagManualJog) {
 			// =========================================================
-			// D. MODE MANUAL (Single Jog & Weld)
+			// D. MODE MANUAL JOG (Pergerakan Relatif / Incremental)
 			// =========================================================
 
-			// 1. Ambil koordinat 32-bit dari Holding Register 6, 7 (X) dan 8, 9 (Y)
-			long targetManX = ((long)Holding_Registers[7] << 16) | Holding_Registers[6];
-			long targetManY = ((long)Holding_Registers[9] << 16) | Holding_Registers[8];
-			long targetManZ = ((long)Holding_Registers[11] << 16) | Holding_Registers[10];
+			// 1. Ambil NILAI GESER (Relative Offset) 32-bit dari Modbus HMI
+			// Contoh: HMI mengirim -10 (mundur 10mm) atau 50 (maju 50mm)
+			long jogManX_mm = (long)( ((uint32_t)Holding_Registers[7] << 16) | (uint32_t)Holding_Registers[6] );
+			long jogManY_mm = (long)( ((uint32_t)Holding_Registers[9] << 16) | (uint32_t)Holding_Registers[8] );
+			long jogManZ_mm = (long)( ((uint32_t)Holding_Registers[11] << 16) | (uint32_t)Holding_Registers[10] );
 
-			// 2. Bergerak ke Target
+			// 2. Kalkulasi Target Absolut = Posisi Aktual Sekarang + Nilai Geser
+			// Kita konversi dulu jarak gesernya ke Pulse, lalu ditambahkan ke posisi mesin sekarang
+			long targetAbsX = motorX->getCurrentPositionPulse() + Convert_mm_to_PulseX(jogManX_mm);
+			long targetAbsY = motorY->getCurrentPositionPulse() + Convert_mm_to_PulseY(jogManY_mm);
+			long targetAbsZ = motorZ->getCurrentPositionPulse() + Convert_mm_to_PulseZ(jogManZ_mm);
+
+			// 3. Suntikkan Target ke Penggerak Utama
 			isNavigating = true;
-			motorX->setTarget(Convert_mm_to_PulseX(targetManX));
-			motorY->setTarget(Convert_mm_to_PulseY(targetManY));
-			motorZ->setTarget(Convert_mm_to_PulseZ(targetManZ));
+			motorX->setTargetPulse(targetAbsX);
+			motorY->setTargetPulse(targetAbsY);
+			motorZ->setTargetPulse(targetAbsZ);
 
-			// Cegah deadlock jika jarak = 0
-			if (motorX->isMoving() || motorY->isMoving()) {
+			// 4. Tunggu Motor Selesai Bergerak
+			if (motorX->isMoving() || motorY->isMoving() || motorZ->isMoving()) {
 				xSemaphoreTake(SinyalPosisiTercapai, portMAX_DELAY);
-			} else {
-				isNavigating = false;
 			}
 
+			// Bebaskan status navigasi
+			isNavigating = false;
+
+			// 5. Cek Kondisi Darurat (Limit Switch / E-Stop saat Jogging)
 			if (isAborted) {
 				flagManualJog = false;
-				continue;
+				continue; // Ulangi loop dari atas untuk mengeksekusi E-Stop
 			}
 
-			flagManualJog = false; // Kembalikan ke mode standby
+			// 6. Selesai Jogging, kembalikan ke mode standby
+			flagManualJog = false;
+
+			// [OPSIONAL TAPI DISARANKAN]: Nol-kan kembali register Modbus agar
+			// jika terjadi koneksi terputus, mesin tidak menyimpan angka sisa jog.
+			Holding_Registers[6] = 0; Holding_Registers[7] = 0;
+			Holding_Registers[8] = 0; Holding_Registers[9] = 0;
+			Holding_Registers[10] = 0; Holding_Registers[11] = 0;
 
 		} else {
 			// =========================================================

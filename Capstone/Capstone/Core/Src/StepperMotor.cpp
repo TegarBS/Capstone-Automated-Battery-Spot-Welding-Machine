@@ -20,7 +20,7 @@ StepperMotor::StepperMotor(GPIO_TypeDef* step_port, uint16_t step_pin, GPIO_Type
 }
 
 // Menetapkan target baru dan mengubah status isMoving menjadi true jika target berbeda
-void StepperMotor::setTarget(long target) {
+void StepperMotor::setTargetPulse(long target) {
     targetPosition = target;
     isMoving(void) = (currentPosition != targetPosition);
 }

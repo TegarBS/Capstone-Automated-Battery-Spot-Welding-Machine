@@ -1,185 +1,76 @@
-#include "Communication.h"
-#include "GlobalData.h"
+/*
+ * Communication.cpp
+ *
+ *  Created on: Jul 31, 2026
+ *      Author: Tegar
+ */
 
-// =========================================================
-// TASK KOMUNIKASI (PARSER MODBUS RTU)
-// =========================================================
+
 #include "Communication.h"
 
 #include "FungsiEEPROM.h"
 #include "GlobalData.h"
 #include "UtilitasDanPerhitungan.h"
 
+// --- Konstanta Modbus ---
+const uint16_t MODBUS_COIL_ON = 0xFF00;
+const uint8_t  MODBUS_EXCEPTION_ILLEGAL_ADDRESS  = 0x02; // Alamat tidak ditemukan
+const uint8_t  MODBUS_EXCEPTION_BUSY             = 0x06; // Perangkat sibuk
+const uint8_t  MODBUS_EXCEPTION_ILLEGAL_FUNCTION = 0x01; // Illegal Function
+
+// --- Daftar Alamat Coil ---
+enum ModbusCoilAddress {
+    COIL_START_AUTO_WELD = 0x0000,
+    COIL_EMERGENCY_STOP  = 0x0001,
+    COIL_REQUEST_HOMING  = 0x0002,
+    COIL_PAUSE_RESUME    = 0x0003,
+    COIL_MANUAL_JOG      = 0x0004,
+    COIL_SAVE_TO_FLASH   = 0x0005,
+    COIL_RESET_SYSTEM    = 0x0006
+};
+
 // =========================================================
 // TASK KOMUNIKASI (PARSER MODBUS RTU ZERO-QUEUE)
 // =========================================================
 void Task_Komunikasi(void *pvParameters) {
+    // Definisi konstanta ID Slave agar tidak menggunakan magic number (0x01)
+    const uint8_t SLAVE_ID = 0x01;
+
     while(1) {
         if (xSemaphoreTake(Sem_DataDiterima, portMAX_DELAY) == pdTRUE) {
 
             uint8_t len = rxIndex;
             rxIndex = 0; // Reset untuk paket berikutnya
 
-            // 1. Validasi Slave ID (ID Mesin kita = 0x01)
-            if (rxBuffer[0] != 0x01) continue;
+            // 1. Validasi Slave ID
+            if (rxBuffer[0] != SLAVE_ID) continue;
 
-            // 2. Validasi CRC16 (Menangkal Noise)
+            // 2. Validasi CRC16
             uint16_t crc_hitung = Hitung_CRC16(rxBuffer, len - 2);
             uint16_t crc_diterima = (rxBuffer[len - 1] << 8) | rxBuffer[len - 2];
             if (crc_hitung != crc_diterima) continue;
 
             uint8_t function_code = rxBuffer[1];
 
-            // -----------------------------------------------------
-            // FUNC 0x04: READ INPUT REGISTERS (Monitor Posisi X & Y)
-            // -----------------------------------------------------
-            if (function_code == 0x04) {
-                uint16_t start_addr = (rxBuffer[2] << 8) | rxBuffer[3];
-                uint16_t quantity   = (rxBuffer[4] << 8) | rxBuffer[5];
+            // 3. Modbus Function Router
+            switch (function_code) {
+                case 0x04:
+                	Function_Code_04(rxBuffer, len);
+                    break;
 
-                if (start_addr + quantity <= 10) {
-                    uint8_t txBuffer[32];
-                    uint8_t byte_count = quantity * 2;
+                case 0x05:
+                	Function_Code_05(rxBuffer, len);
+                    break;
 
-                    txBuffer[0] = 0x01;
-                    txBuffer[1] = 0x04;
-                    txBuffer[2] = byte_count;
+                case 0x06:
+                	Function_Code_06(rxBuffer, len);
+                    break;
 
-                    for (uint16_t i = 0; i < quantity; i++) {
-                        txBuffer[3 + (i * 2)] = (Input_Registers[start_addr + i] >> 8) & 0xFF;
-                        txBuffer[4 + (i * 2)] = Input_Registers[start_addr + i] & 0xFF;
-                    }
-
-                    uint16_t crc_tx = Hitung_CRC16(txBuffer, 3 + byte_count);
-                    txBuffer[3 + byte_count] = crc_tx & 0xFF;
-                    txBuffer[4 + byte_count] = (crc_tx >> 8) & 0xFF;
-
-                    vTaskDelay(5);
-                    HAL_UART_Transmit(&huart1, txBuffer, 5 + byte_count, 100);
-                }
-            }
-
-            // -----------------------------------------------------
-            // FUNC 0x05: WRITE SINGLE COIL (Tombol Aksi HMI)
-            // -----------------------------------------------------
-            else if (function_code == 0x05) {
-                uint16_t coil_addr = (rxBuffer[2] << 8) | rxBuffer[3];
-                uint16_t coil_val  = (rxBuffer[4] << 8) | rxBuffer[5];
-
-                // COIL 0: START AUTO WELD
-                if (coil_addr == 0x0000 && coil_val == 0xFF00) {
-                    indexKolomAktual = 0; // Reset memori pola
-                    indexBarisAktual = 0;
-                    isAutoWeldActive = true; // Nyalakan mesin!
-                }
-                // COIL 1: ABORT / EMERGENCY STOP
-                else if (coil_addr == 0x0001 && coil_val == 0xFF00) {
-                    isAborted = true;
-                    isPaused = false;
-                }
-                // COIL 2: REQUEST HOMING
-                else if (coil_addr == 0x0002 && coil_val == 0xFF00) {
-                    flagMintaHoming = true;
-                }
-                // COIL 3: PAUSE & RESUME
-				else if (coil_addr == 0x0003) {
-					if (coil_val == 0xFF00) isPaused = true;
-					else isPaused = false;
-				}
-				// COIL 4: TRIGGER MODE MANUAL JOG
-				else if (coil_addr == 0x0003) {
-					if (coil_val == 0xFF00) flagManualJog = true;
-					else flagManualJog = false;
-				}
-                // COIL 5: TRIGGER SAVE TO FLASH (EEPROM)
-				else if (coil_addr == 0x0005 && coil_val == 0xFF00) {
-
-					// Coba simpan ke Flash
-					if (Save_Settings_To_Flash() == true) {
-						// Jika berhasil (Mesin aman), Echo balik ke HMI tanda sukses
-						HAL_UART_Transmit(&huart1, rxBuffer, len, 100);
-					} else {
-						// Jika Gagal (Mesin sibuk), Kirim Modbus Exception 0x06 (Slave Device Busy)
-						uint8_t txBuffer[5];
-						txBuffer[0] = rxBuffer[0];          // Slave ID
-						txBuffer[1] = function_code | 0x80; // Function Code + 0x80 (Penanda Error)
-						txBuffer[2] = 0x06;                 // Exception 0x06: Slave Device Busy
-
-						uint16_t crc_tx = Hitung_CRC16(txBuffer, 3);
-						txBuffer[3] = crc_tx & 0xFF;
-						txBuffer[4] = (crc_tx >> 8) & 0xFF;
-
-						HAL_UART_Transmit(&huart1, txBuffer, 5, 100);
-					}
-				}
-
-                // -----------------------------------------------------
-				// COIL 6: RESET SYSTEM (REBOOT MCU)
-				// -----------------------------------------------------
-				else if (coil_addr == 0x0006 && coil_val == 0xFF00) {
-
-					// 1. ECHO (BALAS) KE HMI TERLEBIH DAHULU!
-					// Ini wajib agar HMI Python menerima jawaban "OK" dan tidak terkena Timeout Error.
-					HAL_UART_Transmit(&huart1, rxBuffer, len, 100);
-
-					// 2. Beri waktu sebentar (50ms) agar sinyal UART benar-benar selesai terkirim dari kabel
-					vTaskDelay(pdMS_TO_TICKS(50));
-
-					// 3. TARIK PELATUK RESET!
-					// Perintah ini akan langsung mematikan dan menghidupkan ulang seluruh sistem STM32
-					NVIC_SystemReset();
-				}
-
-                // Echo balik ke Master (HMI) tanda sukses
-                vTaskDelay(5);
-                HAL_UART_Transmit(&huart1, rxBuffer, len, 100);
-            }
-
-            // -----------------------------------------------------
-            // FUNC 0x06: WRITE SINGLE REGISTER (Setting Mesin)
-            // -----------------------------------------------------
-            else if (function_code == 0x06) {
-                uint16_t alamat_offset = (rxBuffer[2] << 8) | rxBuffer[3];
-                uint16_t data_baru     = (rxBuffer[4] << 8) | rxBuffer[5];
-
-                if (alamat_offset < TOTAL_HOLDING_REGISTERS) {
-                    Holding_Registers[alamat_offset] = data_baru;
-
-                    // MENGISI "OTAK" MESIN (Sinkronisasi ke configLas)
-                    // HMI harus mengirim data pitch dikali 10 (contoh: 18.5mm jadi 185)
-                    if (alamat_offset == 0) configLas.totalKolom = data_baru;
-                    if (alamat_offset == 1) configLas.totalBaris = data_baru;
-                    if (alamat_offset == 2) configLas.pitchX = (float)data_baru / 10.0f;
-                    if (alamat_offset == 3) configLas.pitchY = (float)data_baru / 10.0f;
-
-                    // Catatan: Reg 4 (Drop Delay) dan Reg 5 (Weld Time) biarkan
-                    // tersimpan di Holding_Registers karena dibaca langsung oleh Sequencer
-                }
-
-                if (alamat_offset >= 20) {
-					// Update motor jika ada perubahan konfigurasi
-					Update_Motor_Speed_From_Settings();
-				}
-
-                vTaskDelay(5);
-                HAL_UART_Transmit(&huart1, rxBuffer, len, 100);
-            }
-
-            // -----------------------------------------------------
-            // ILLEGAL FUNCTION / EXCEPTION
-            // -----------------------------------------------------
-            else {
-                uint8_t txBuffer[5];
-                txBuffer[0] = rxBuffer[0];
-                txBuffer[1] = function_code | 0x80;
-                txBuffer[2] = 0x01;
-
-                uint16_t crc_tx = Hitung_CRC16(txBuffer, 3);
-                txBuffer[3] = crc_tx & 0xFF;
-                txBuffer[4] = (crc_tx >> 8) & 0xFF;
-
-                vTaskDelay(5);
-                HAL_UART_Transmit(&huart1, txBuffer, 5, 100);
+                default:
+                    // ILLEGAL FUNCTION (Fungsi selain 0x04, 0x05, 0x06)
+                    // Manfaatkan fungsi Exception universal yang sudah kita buat sebelumnya
+                    Send_Modbus_Exception(rxBuffer[0], function_code, MODBUS_EXCEPTION_ILLEGAL_FUNCTION);
+                    break;
             }
         }
     }
@@ -212,6 +103,139 @@ extern "C" void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
     }
 }
 
+// -----------------------------------------------------
+// FUNC 0x04: READ INPUT REGISTERS (Monitor Posisi X & Y)
+// -----------------------------------------------------
+void Function_Code_04(uint8_t* rxBuffer, uint8_t len) {
+    uint16_t start_addr = (rxBuffer[2] << 8) | rxBuffer[3];
+    uint16_t quantity   = (rxBuffer[4] << 8) | rxBuffer[5];
+
+    // Asumsi TOTAL_INPUT_REGISTERS didefinisikan sebagai macro (misal: 10)
+    if (start_addr + quantity <= 10) {
+        uint8_t txBuffer[32];
+        uint8_t byte_count = quantity * 2;
+
+        txBuffer[0] = rxBuffer[0]; // Slave ID
+        txBuffer[1] = 0x04;
+        txBuffer[2] = byte_count;
+
+        for (uint16_t i = 0; i < quantity; i++) {
+            txBuffer[3 + (i * 2)] = (Input_Registers[start_addr + i] >> 8) & 0xFF;
+            txBuffer[4 + (i * 2)] = Input_Registers[start_addr + i] & 0xFF;
+        }
+
+        uint16_t crc_tx = Hitung_CRC16(txBuffer, 3 + byte_count);
+        txBuffer[3 + byte_count] = crc_tx & 0xFF;
+        txBuffer[4 + byte_count] = (crc_tx >> 8) & 0xFF;
+
+        vTaskDelay(pdMS_TO_TICKS(5));
+        HAL_UART_Transmit(&huart1, txBuffer, 5 + byte_count, 100);
+    } else {
+        // Alamat melebihi batas, kirim Exception 0x02 (Illegal Data Address)
+        Send_Modbus_Exception(rxBuffer[0], 0x04, MODBUS_EXCEPTION_ILLEGAL_ADDRESS);
+    }
+}
+
+// -----------------------------------------------------
+// FUNC 0x05: WRITE SINGLE COIL (Tombol Aksi HMI)
+// -----------------------------------------------------
+void Function_Code_05(uint8_t* rxBuffer, uint8_t len) {
+    uint16_t coil_addr = (rxBuffer[2] << 8) | rxBuffer[3];
+    uint16_t coil_val  = (rxBuffer[4] << 8) | rxBuffer[5];
+
+    bool send_echo = true;
+
+    switch (coil_addr) {
+        case COIL_START_AUTO_WELD:
+            if (coil_val == MODBUS_COIL_ON) {
+                indexKolomAktual = 0;
+                indexBarisAktual = 0;
+                isAutoWeldActive = true;
+            }
+            break;
+
+        case COIL_EMERGENCY_STOP:
+            if (coil_val == MODBUS_COIL_ON) {
+                isAborted = true;
+                isPaused = false;
+            }
+            break;
+
+        case COIL_REQUEST_HOMING:
+            if (coil_val == MODBUS_COIL_ON) {
+                flagMintaHoming = true;
+            }
+            break;
+
+        case COIL_PAUSE_RESUME:
+            isPaused = (coil_val == MODBUS_COIL_ON);
+            break;
+
+        case COIL_MANUAL_JOG:
+            if (coil_val == MODBUS_COIL_ON) {
+                flagManualJog = true;
+            }
+            break;
+
+        case COIL_SAVE_TO_FLASH:
+            if (coil_val == MODBUS_COIL_ON) {
+                if (!Save_Settings_To_Flash()) {
+                    Send_Modbus_Exception(rxBuffer[0], 0x05, MODBUS_EXCEPTION_BUSY);
+                    send_echo = false;
+                }
+            }
+            break;
+
+        case COIL_RESET_SYSTEM:
+            if (coil_val == MODBUS_COIL_ON) {
+                Process_System_Reset(rxBuffer, len);
+                send_echo = false;
+            }
+            break;
+
+        default:
+            Send_Modbus_Exception(rxBuffer[0], 0x05, MODBUS_EXCEPTION_ILLEGAL_ADDRESS);
+            send_echo = false;
+            break;
+    }
+
+    if (send_echo) {
+        vTaskDelay(pdMS_TO_TICKS(5));
+        HAL_UART_Transmit(&huart1, rxBuffer, len, 100);
+    }
+}
+
+// -----------------------------------------------------
+// FUNC 0x06: WRITE SINGLE REGISTER (Setting Mesin)
+// -----------------------------------------------------
+void Function_Code_06(uint8_t* rxBuffer, uint8_t len) {
+    uint16_t alamat_offset = (rxBuffer[2] << 8) | rxBuffer[3];
+    uint16_t data_baru     = (rxBuffer[4] << 8) | rxBuffer[5];
+
+    if (alamat_offset < TOTAL_HOLDING_REGISTERS) {
+        Holding_Registers[alamat_offset] = data_baru;
+
+        // Gunakan switch-case agar sinkronisasi lebih rapi
+        switch (alamat_offset) {
+            case 0: configLas.totalKolom = data_baru; break;
+            case 1: configLas.totalBaris = data_baru; break;
+            case 2: configLas.pitchX = (float)data_baru / 10.0f; break;
+            case 3: configLas.pitchY = (float)data_baru / 10.0f; break;
+            default: break;
+        }
+
+        if (alamat_offset >= 20) {
+            Update_Motor_Speed_From_Settings();
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(5));
+        HAL_UART_Transmit(&huart1, rxBuffer, len, 100);
+    } else {
+        // Alamat melebihi batas
+        Send_Modbus_Exception(rxBuffer[0], 0x06, MODBUS_EXCEPTION_ILLEGAL_ADDRESS);
+    }
+}
+
 // =========================================================
 // FUNGSI MATEMATIKA CRC16 MODBUS
 // =========================================================
@@ -229,4 +253,29 @@ uint16_t Hitung_CRC16(const uint8_t *nData, uint16_t wLength) {
         }
     }
     return wCRC;
+}
+
+void Process_System_Reset(uint8_t* rxBuffer, uint16_t len) {
+    // 1. Echo ke HMI agar tidak Timeout
+    HAL_UART_Transmit(&huart1, rxBuffer, len, 100);
+
+    // 2. Tunggu transmisi UART selesai
+    vTaskDelay(pdMS_TO_TICKS(50));
+
+    // 3. Reboot MCU
+    NVIC_SystemReset();
+}
+
+void Send_Modbus_Exception(uint8_t slave_id, uint8_t function_code, uint8_t exception_code) {
+    uint8_t txBuffer[5];
+    txBuffer[0] = slave_id;
+    txBuffer[1] = function_code | 0x80; // Standar Modbus: Function Code + 0x80 untuk menandakan Error
+    txBuffer[2] = exception_code;       // Masukkan kode error (0x02 atau 0x06)
+
+    uint16_t crc_tx = Hitung_CRC16(txBuffer, 3);
+    txBuffer[3] = crc_tx & 0xFF;
+    txBuffer[4] = (crc_tx >> 8) & 0xFF;
+
+    vTaskDelay(pdMS_TO_TICKS(5));
+    HAL_UART_Transmit(&huart1, txBuffer, 5, 100);
 }

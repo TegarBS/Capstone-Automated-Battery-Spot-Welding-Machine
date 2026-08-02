@@ -39,7 +39,7 @@ bool StepperMotor::isMoving(void) {
 	return isMoving_flag;
 }
 
-void StepperMotor::setTarget(long target) {
+void StepperMotor::setTargetPulse(long target) {
     if (currentPositionPulse == target) return;
 
     targetPositionPulse = target;

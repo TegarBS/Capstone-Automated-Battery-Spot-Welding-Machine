@@ -18,6 +18,8 @@
 #define TOTAL_COILS 10
 #define TOTAL_DISCRETE_INPUT 10
 
+#define SKALA_FLOAT 100.0f
+
 // =========================================================
 // [STRUCT PARAMETER PERMANEN (EEPROM)]
 // =========================================================

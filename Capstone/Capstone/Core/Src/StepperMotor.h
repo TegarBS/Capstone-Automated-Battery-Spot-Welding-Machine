@@ -31,7 +31,7 @@ public:
     StepperMotor(GPIO_TypeDef* step_port, uint16_t step_pin, GPIO_TypeDef* dir_port, uint16_t dir_pin);
 
     // Fungsi untuk menetapkan target koordinat baru
-    void setTarget(long target);
+    void setTargetPulse(long target);
 
     // Fungsi utama yang akan dipanggil oleh Timer Interrupt setiap sekian mikrodetik
     void update();

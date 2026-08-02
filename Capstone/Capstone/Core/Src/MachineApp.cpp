@@ -48,8 +48,8 @@ void MachineApp_Init(void) {
 
 
     // [UJI COBA]: Memberikan target fiktif agar motor langsung bergerak saat mesin menyala
-    motorX->setTarget(6400); // Bergerak maju 6400 step (1 putaran penuh dengan 1/32 microstepping)
-    motorY->setTarget(-3200); // Bergerak mundur setengah putaran
+    motorX->setTargetPulse(6400); // Bergerak maju 6400 step (1 putaran penuh dengan 1/32 microstepping)
+    motorY->setTargetPulse(-3200); // Bergerak mundur setengah putaran
 
     // [TAMBAHAN UNTUK LANGKAH 5: Pemicu awal FSM]
     // Kita paksa mesin langsung masuk ke mode gerak saat dinyalakan (untuk uji coba)
