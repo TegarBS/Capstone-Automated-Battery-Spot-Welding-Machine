@@ -16,7 +16,7 @@ StepperMotor::StepperMotor(GPIO_TypeDef* step_port, uint16_t step_pin, GPIO_Type
 
     currentPositionPulse = 0;
     targetPositionPulse = 0;
-    isMoving = false;
+    isMoving_flag = false;
     invertDir = false;
     state = IDLE_STATE;
 
@@ -33,6 +33,10 @@ StepperMotor::StepperMotor(GPIO_TypeDef* step_port, uint16_t step_pin, GPIO_Type
 
     currentSpeedHz = 0;   // Frekuensi aktual saat ini
     deltaSpeedHz = 0;    	// Lonjakan frekuensi per langkah
+}
+
+bool StepperMotor::isMoving(void) {
+	return isMoving_flag;
 }
 
 void StepperMotor::setTarget(long target) {
@@ -76,7 +80,7 @@ void StepperMotor::setTarget(long target) {
     // 4. Mulai Pergerakan dari Frekuensi Terendah
     currentSpeedHz = minSpeedHz;
     state = ACCELERATING;
-    isMoving = true;
+    isMoving_flag = true;
 
     // Kalkulasi nilai ARR perdana dan jalankan timer
     uint32_t startARR = (uint32_t)(timerClock / currentSpeedHz);
@@ -104,7 +108,7 @@ void StepperMotor::setAccelHz(float inputAccelHz){
 
 // FUNGSI INI BERJALAN 100% DI DALAM INTERUPSI HARDWARE
 void StepperMotor::isr_update(void) {
-    if (!isMoving) return;
+    if (!isMoving_flag) return;
 
     // 1. Tembakkan Pulsa STEP
     HAL_GPIO_WritePin(stepPort, stepPin, GPIO_PIN_SET);
@@ -120,7 +124,7 @@ void StepperMotor::isr_update(void) {
     if (stepsToGo == 0) {
         // TARGET TERCAPAI
         HAL_TIM_Base_Stop_IT(htim);
-        isMoving = false;
+        isMoving_flag = false;
         state = IDLE_STATE;
 
         // (Panggil Semaphore RTOS Anda di file MachineApp.cpp seperti sebelumnya)
@@ -150,14 +154,14 @@ void StepperMotor::isr_update(void) {
 void StepperMotor::stop(void) {
     HAL_TIM_Base_Stop_IT(htim); // Matikan Timer instan!
     targetPositionPulse = currentPositionPulse;
-    isMoving = false;
+    isMoving_flag = false;
     state = IDLE_STATE;
 }
 
 void StepperMotor::resetPosition(void) {
     currentPositionPulse = 0;
     targetPositionPulse = 0;
-    isMoving = false;
+    isMoving_flag = false;
     state = IDLE_STATE;
 }
 

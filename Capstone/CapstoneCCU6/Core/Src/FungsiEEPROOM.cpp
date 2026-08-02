@@ -41,7 +41,7 @@ bool Save_Settings_To_Flash(void) {
     }
 
     if (motorX && motorY) {
-        if (motorX->isMoving || motorY->isMoving) {
+        if (motorX->isMoving() || motorY->isMoving()) {
             return false; // TOLAK PERINTAH! Motor sedang berputar
         }
     }

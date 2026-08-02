@@ -16,19 +16,19 @@ StepperMotor::StepperMotor(GPIO_TypeDef* step_port, uint16_t step_pin, GPIO_Type
 
     currentPosition = 0;
     targetPosition = 0;
-    isMoving = false;
+    isMoving(void) = false;
 }
 
 // Menetapkan target baru dan mengubah status isMoving menjadi true jika target berbeda
 void StepperMotor::setTarget(long target) {
     targetPosition = target;
-    isMoving = (currentPosition != targetPosition);
+    isMoving(void) = (currentPosition != targetPosition);
 }
 
 // Fungsi Pacing: Inilah yang membuat motor melangkah 1 step setiap kali dipanggil
 void StepperMotor::update() {
     // Jika sudah sampai target, jangan lakukan apa-apa
-    if (!isMoving) return;
+    if (!isMoving(void)) return;
 
     // 1. Tentukan Arah (Direction)
     if (currentPosition < targetPosition) {
@@ -53,21 +53,21 @@ void StepperMotor::update() {
 
     // 3. Evaluasi apakah target sudah tercapai di langkah ini
     if (currentPosition == targetPosition) {
-        isMoving = false;
+        isMoving(void) = false;
     }
 }
 
 // Menghentikan motor secara paksa (berguna saat menabrak limit switch)
 void StepperMotor::stop() {
     targetPosition = currentPosition;
-    isMoving = false;
+    isMoving(void) = false;
 }
 
 // Menjadikan posisi saat ini sebagai Titik Nol (0,0) - dipakai setelah Auto Home
 void StepperMotor::resetPosition() {
     currentPosition = 0;
     targetPosition = 0;
-    isMoving = false;
+    isMoving(void) = false;
 }
 
 // Mengambil data koordinat aktual

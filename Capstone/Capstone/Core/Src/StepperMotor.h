@@ -25,7 +25,7 @@ private:
 
 public:
     // Bendera status pergerakan motor
-    bool isMoving;
+    bool isMoving(void);
 
     // Constructor: Dipanggil saat objek motor pertama kali dibuat
     StepperMotor(GPIO_TypeDef* step_port, uint16_t step_pin, GPIO_TypeDef* dir_port, uint16_t dir_pin);

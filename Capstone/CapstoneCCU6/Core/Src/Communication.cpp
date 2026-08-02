@@ -87,8 +87,9 @@ void Task_Komunikasi(void *pvParameters) {
 					else isPaused = false;
 				}
 				// COIL 4: TRIGGER MODE MANUAL JOG
-				else if (coil_addr == 0x0004 && coil_val == 0xFF00) {
-					flagManualJog = true; // Bangunkan Sequencer untuk mode manual
+				else if (coil_addr == 0x0003) {
+					if (coil_val == 0xFF00) flagManualJog = true;
+					else flagManualJog = false;
 				}
                 // COIL 5: TRIGGER SAVE TO FLASH (EEPROM)
 				else if (coil_addr == 0x0005 && coil_val == 0xFF00) {

@@ -75,7 +75,7 @@ void MachineApp_Loop(void) {
 
         case STATE_MOVE_XY:
             // Cek apakah kedua motor sudah sampai di tujuan (isMoving == false)
-            if (!motorX->isMoving && !motorY->isMoving) {
+            if (!motorX->isMoving(void) && !motorY->isMoving(void)) {
                 // Motor sampai! Pindah ke fase berikutnya: Turunkan Pneumatik Z
                 currentState = STATE_DROP_Z;
 

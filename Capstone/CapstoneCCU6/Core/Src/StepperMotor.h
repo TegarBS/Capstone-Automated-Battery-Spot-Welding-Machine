@@ -38,9 +38,11 @@ private:
     
     float accelHz;
 
+    bool isMoving_flag;
+
 
 public:
-    bool isMoving;
+    bool isMoving(void);
 
     // Constructor kini meminta input Hardware Timer
     StepperMotor(GPIO_TypeDef* step_port, uint16_t step_pin, GPIO_TypeDef* dir_port, uint16_t dir_pin, TIM_HandleTypeDef* timer);

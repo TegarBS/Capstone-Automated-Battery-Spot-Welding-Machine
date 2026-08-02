@@ -90,7 +90,7 @@ void Task_Sequencer(void *pvParameters) {
 			}
 
 			// Tunggu Semaphore HANYA JIKA ada motor yang benar-benar bergerak
-			if (motorX->isMoving || motorY->isMoving) {
+			if (motorX->isMoving() || motorY->isMoving()) {
 				xSemaphoreTake(SinyalPosisiTercapai, portMAX_DELAY);
 			}
 
@@ -175,7 +175,7 @@ void Task_Sequencer(void *pvParameters) {
 				motorX->setTarget(targetPulseX);
 				motorY->setTarget(targetPulseY);
 
-				if (motorX->isMoving || motorY->isMoving) {
+				if (motorX->isMoving() || motorY->isMoving()) {
 					xSemaphoreTake(SinyalPosisiTercapai, portMAX_DELAY);
 				} else {
 					isNavigating = false;
@@ -231,7 +231,7 @@ void Task_Sequencer(void *pvParameters) {
 			motorZ->setTarget(Convert_mm_to_PulseZ(targetManZ));
 
 			// Cegah deadlock jika jarak = 0
-			if (motorX->isMoving || motorY->isMoving) {
+			if (motorX->isMoving() || motorY->isMoving()) {
 				xSemaphoreTake(SinyalPosisiTercapai, portMAX_DELAY);
 			} else {
 				isNavigating = false;
@@ -280,7 +280,7 @@ extern "C" void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 
     // 4. SINKRONISASI KE RTOS (Evaluasi Target atau Abort)
     // Jika sedang navigasi dan kedua motor telah berhenti (entah karena sampai atau di-Abort)
-    if (isNavigating && !motorX->isMoving && !motorY->isMoving && !motorZ->isMoving) {
+    if (isNavigating && !motorX->isMoving() && !motorY->isMoving() && !motorZ->isMoving()) {
         isNavigating = false;
 
         // Bangunkan Task_Sequencer
@@ -322,7 +322,7 @@ extern "C" void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 		// PASTIKAN KEDUA MOTOR SUDAH BERHENTI
 		// Jika mesin homing diagonal, X mungkin nabrak duluan sementara Y masih jalan.
 		// Kita baru boleh membangunkan RTOS jika keduanya sudah benar-benar stop.
-		if (!motorX->isMoving && !motorY->isMoving) {
+		if (!motorX->isMoving() && !motorY->isMoving()) {
 
 			isNavigating = false; // Matikan bendera
 
