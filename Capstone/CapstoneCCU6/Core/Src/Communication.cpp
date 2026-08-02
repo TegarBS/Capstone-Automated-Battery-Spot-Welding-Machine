@@ -67,8 +67,6 @@ void Task_Komunikasi(void *pvParameters) {
                     break;
 
                 default:
-                    // ILLEGAL FUNCTION (Fungsi selain 0x04, 0x05, 0x06)
-                    // Manfaatkan fungsi Exception universal yang sudah kita buat sebelumnya
                     Send_Modbus_Exception(rxBuffer[0], function_code, MODBUS_EXCEPTION_ILLEGAL_FUNCTION);
                     break;
             }
@@ -106,16 +104,16 @@ extern "C" void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 // -----------------------------------------------------
 // FUNC 0x04: READ INPUT REGISTERS (Monitor Posisi X & Y)
 // -----------------------------------------------------
-void Function_Code_04(uint8_t* rxBuffer, uint8_t len) {
-    uint16_t start_addr = (rxBuffer[2] << 8) | rxBuffer[3];
-    uint16_t quantity   = (rxBuffer[4] << 8) | rxBuffer[5];
+void Function_Code_04(uint8_t* rxBufferInput, uint8_t len) {
+    uint16_t start_addr = (rxBufferInput[2] << 8) | rxBufferInput[3];
+    uint16_t quantity   = (rxBufferInput[4] << 8) | rxBuffer[5];
 
     // Asumsi TOTAL_INPUT_REGISTERS didefinisikan sebagai macro (misal: 10)
     if (start_addr + quantity <= 10) {
         uint8_t txBuffer[32];
         uint8_t byte_count = quantity * 2;
 
-        txBuffer[0] = rxBuffer[0]; // Slave ID
+        txBuffer[0] = rxBufferInput[0]; // Slave ID
         txBuffer[1] = 0x04;
         txBuffer[2] = byte_count;
 
@@ -132,16 +130,16 @@ void Function_Code_04(uint8_t* rxBuffer, uint8_t len) {
         HAL_UART_Transmit(&huart1, txBuffer, 5 + byte_count, 100);
     } else {
         // Alamat melebihi batas, kirim Exception 0x02 (Illegal Data Address)
-        Send_Modbus_Exception(rxBuffer[0], 0x04, MODBUS_EXCEPTION_ILLEGAL_ADDRESS);
+        Send_Modbus_Exception(rxBufferInput[0], 0x04, MODBUS_EXCEPTION_ILLEGAL_ADDRESS);
     }
 }
 
 // -----------------------------------------------------
 // FUNC 0x05: WRITE SINGLE COIL (Tombol Aksi HMI)
 // -----------------------------------------------------
-void Function_Code_05(uint8_t* rxBuffer, uint8_t len) {
-    uint16_t coil_addr = (rxBuffer[2] << 8) | rxBuffer[3];
-    uint16_t coil_val  = (rxBuffer[4] << 8) | rxBuffer[5];
+void Function_Code_05(uint8_t* rxBufferInput, uint8_t len) {
+    uint16_t coil_addr = (rxBufferInput[2] << 8) | rxBufferInput[3];
+    uint16_t coil_val  = (rxBufferInput[4] << 8) | rxBufferInput[5];
 
     bool send_echo = true;
 
@@ -180,7 +178,7 @@ void Function_Code_05(uint8_t* rxBuffer, uint8_t len) {
         case COIL_SAVE_TO_FLASH:
             if (coil_val == MODBUS_COIL_ON) {
                 if (!Save_Settings_To_Flash()) {
-                    Send_Modbus_Exception(rxBuffer[0], 0x05, MODBUS_EXCEPTION_BUSY);
+                    Send_Modbus_Exception(rxBufferInput[0], 0x05, MODBUS_EXCEPTION_BUSY);
                     send_echo = false;
                 }
             }
@@ -188,29 +186,29 @@ void Function_Code_05(uint8_t* rxBuffer, uint8_t len) {
 
         case COIL_RESET_SYSTEM:
             if (coil_val == MODBUS_COIL_ON) {
-                Process_System_Reset(rxBuffer, len);
+                Process_System_Reset(rxBufferInput, len);
                 send_echo = false;
             }
             break;
 
         default:
-            Send_Modbus_Exception(rxBuffer[0], 0x05, MODBUS_EXCEPTION_ILLEGAL_ADDRESS);
+            Send_Modbus_Exception(rxBufferInput[0], 0x05, MODBUS_EXCEPTION_ILLEGAL_ADDRESS);
             send_echo = false;
             break;
     }
 
     if (send_echo) {
         vTaskDelay(pdMS_TO_TICKS(5));
-        HAL_UART_Transmit(&huart1, rxBuffer, len, 100);
+        HAL_UART_Transmit(&huart1, rxBufferInput, len, 100);
     }
 }
 
 // -----------------------------------------------------
 // FUNC 0x06: WRITE SINGLE REGISTER (Setting Mesin)
 // -----------------------------------------------------
-void Function_Code_06(uint8_t* rxBuffer, uint8_t len) {
-    uint16_t alamat_offset = (rxBuffer[2] << 8) | rxBuffer[3];
-    uint16_t data_baru     = (rxBuffer[4] << 8) | rxBuffer[5];
+void Function_Code_06(uint8_t* rxBufferInput, uint8_t len) {
+    uint16_t alamat_offset = (rxBufferInput[2] << 8) | rxBufferInput[3];
+    uint16_t data_baru     = (rxBufferInput[4] << 8) | rxBufferInput[5];
 
     if (alamat_offset < TOTAL_HOLDING_REGISTERS) {
         Holding_Registers[alamat_offset] = data_baru;
@@ -229,10 +227,10 @@ void Function_Code_06(uint8_t* rxBuffer, uint8_t len) {
         }
 
         vTaskDelay(pdMS_TO_TICKS(5));
-        HAL_UART_Transmit(&huart1, rxBuffer, len, 100);
+        HAL_UART_Transmit(&huart1, rxBufferInput, len, 100);
     } else {
         // Alamat melebihi batas
-        Send_Modbus_Exception(rxBuffer[0], 0x06, MODBUS_EXCEPTION_ILLEGAL_ADDRESS);
+        Send_Modbus_Exception(rxBufferInput[0], 0x06, MODBUS_EXCEPTION_ILLEGAL_ADDRESS);
     }
 }
 
@@ -255,9 +253,9 @@ uint16_t Hitung_CRC16(const uint8_t *nData, uint16_t wLength) {
     return wCRC;
 }
 
-void Process_System_Reset(uint8_t* rxBuffer, uint16_t len) {
+void Process_System_Reset(uint8_t* rxBufferInput, uint16_t len) {
     // 1. Echo ke HMI agar tidak Timeout
-    HAL_UART_Transmit(&huart1, rxBuffer, len, 100);
+    HAL_UART_Transmit(&huart1, rxBufferInput, len, 100);
 
     // 2. Tunggu transmisi UART selesai
     vTaskDelay(pdMS_TO_TICKS(50));
