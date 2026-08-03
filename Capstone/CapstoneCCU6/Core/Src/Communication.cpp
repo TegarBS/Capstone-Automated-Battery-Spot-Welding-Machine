@@ -54,9 +54,13 @@ void Task_Komunikasi(void *pvParameters) {
 
             // 3. Modbus Function Router
             switch (function_code) {
-                case 0x04:
-                	Function_Code_04(rxBuffer, len);
-                    break;
+				case 0x03:
+						Function_Code_03(rxBuffer, len);
+						break;
+
+				case 0x04:
+						Function_Code_04(rxBuffer, len);
+						break;
 
                 case 0x05:
                 	Function_Code_05(rxBuffer, len);
@@ -102,11 +106,53 @@ extern "C" void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 }
 
 // -----------------------------------------------------
+// FUNC 0x03: READ HOLDING REGISTERS
+// -----------------------------------------------------
+void Function_Code_03(uint8_t* rxBufferInput, uint8_t len) {
+    uint16_t start_addr = (rxBufferInput[2] << 8) | rxBufferInput[3];
+    uint16_t quantity   = (rxBufferInput[4] << 8) | rxBufferInput[5]; // Typo diperbaiki
+
+    // Pengecekan batas aman memori Modbus
+    if (start_addr + quantity <= TOTAL_HOLDING_REGISTERS) {
+
+        // Modbus bisa meminta hingga 125 register (250 byte),
+        // pastikan buffer cukup besar (maks standar Modbus RTU adalah 256 byte)
+        uint8_t txBuffer[256];
+        uint8_t byte_count = quantity * 2;
+
+        txBuffer[0] = rxBufferInput[0]; // Slave ID
+        txBuffer[1] = 0x03;             // Function Code: 03 (Read Holding Registers)
+        txBuffer[2] = byte_count;       // Jumlah byte data yang akan dikirim
+
+        // Ambil data dari Holding_Registers
+        for (uint16_t i = 0; i < quantity; i++) {
+            txBuffer[3 + (i * 2)] = (Holding_Registers[start_addr + i] >> 8) & 0xFF; // High Byte
+            txBuffer[4 + (i * 2)] = Holding_Registers[start_addr + i] & 0xFF;        // Low Byte
+        }
+
+        // Kalkulasi CRC
+        uint16_t crc_tx = Hitung_CRC16(txBuffer, 3 + byte_count);
+        txBuffer[3 + byte_count] = crc_tx & 0xFF;         // CRC Low
+        txBuffer[4 + byte_count] = (crc_tx >> 8) & 0xFF;  // CRC High
+
+        // Jeda aman untuk Transceiver RS485
+        vTaskDelay(pdMS_TO_TICKS(5));
+
+        // Kirim balasan ke HMI/PC
+        HAL_UART_Transmit(&huart1, txBuffer, 5 + byte_count, 100);
+
+    } else {
+        // Alamat melebihi batas, kirim Exception 0x02 (Illegal Data Address)
+        Send_Modbus_Exception(rxBufferInput[0], 0x03, MODBUS_EXCEPTION_ILLEGAL_ADDRESS);
+    }
+}
+
+// -----------------------------------------------------
 // FUNC 0x04: READ INPUT REGISTERS (Monitor Posisi X & Y)
 // -----------------------------------------------------
 void Function_Code_04(uint8_t* rxBufferInput, uint8_t len) {
     uint16_t start_addr = (rxBufferInput[2] << 8) | rxBufferInput[3];
-    uint16_t quantity   = (rxBufferInput[4] << 8) | rxBuffer[5];
+    uint16_t quantity   = (rxBufferInput[4] << 8) | rxBufferInput[5];
 
     // Asumsi TOTAL_INPUT_REGISTERS didefinisikan sebagai macro (misal: 10)
     if (start_addr + quantity <= 10) {

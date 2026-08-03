@@ -11,6 +11,7 @@
 #include "Communication.h"
 #include "GlobalData.h"
 #include "UtilitasDanPerhitungan.h"
+#include "FungsiEEPROM.h"
 
 // Definisi Pin Fiktif untuk Relay dan Las
 #ifndef RELAY_Z_PORT
@@ -26,7 +27,7 @@ void Task_Monitor(void *pvParameters);
 
 // --- FUNGSI INISIALISASI MESIN ---
 void MachineApp_Init(void) {
-	void Load_Settings_From_Flash(void);
+	Load_Settings_From_Flash();
 
     motorX = new StepperMotor(STEP_X_GPIO_Port, STEP_X_Pin, DIR_X_GPIO_Port, DIR_X_Pin, &htim2);
     motorY = new StepperMotor(STEP_Y_GPIO_Port, STEP_Y_Pin, DIR_Y_GPIO_Port, DIR_Y_Pin, &htim3);
