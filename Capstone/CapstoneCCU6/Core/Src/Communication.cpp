@@ -40,6 +40,15 @@ enum FunctionCode {
     WRITE_SINGLE_REGISTER  = 0x06
 };
 
+// Kamus Alamat Modbus Discrete Inputs (Read-Only Hardware)
+enum ModbusDiscreteInput {
+    DI_LIMIT_SWITCH_X = 0x0000,
+    DI_LIMIT_SWITCH_Y = 0x0001,
+    DI_LIMIT_SWITCH_Z = 0x0002,
+
+    MAX_DISCRETE_INPUTS = 3
+};
+
 // =========================================================
 // TASK KOMUNIKASI (PARSER MODBUS RTU ZERO-QUEUE)
 // =========================================================
@@ -68,6 +77,11 @@ void Task_Komunikasi(void *pvParameters) {
 				case READ_COIL:
 					Function_Code_01_READ_COILS(rxBuffer, len);
 					break;
+
+				case READ_DISCRETE_INPUT:
+					Function_Code_02_READ_DISCRETE_INPUT(rxBuffer, len);
+					break;
+
 				case READ_HOLDING_REGISTER:
 					Function_Code_03_READ_HOLDING_REGISTER(rxBuffer, len);
 					break;
@@ -198,6 +212,80 @@ bool Baca_Status_Coil(uint16_t coil_addr) {
             return false; // Alamat tidak valid
     }
 }
+
+// -----------------------------------------------------
+// FUNC 0x02: READ DISCRETE INPUT
+// -----------------------------------------------------
+void Function_Code_02_READ_DISCRETE_INPUT(uint8_t* rxBufferInput, uint8_t len) {
+    // 1. Ambil Alamat Awal dan Jumlah Input yang diminta HMI
+    uint16_t start_addr = (rxBufferInput[2] << 8) | rxBufferInput[3];
+    uint16_t quantity   = (rxBufferInput[4] << 8) | rxBufferInput[5];
+
+    // 2. Validasi Batas Alamat
+    if ((start_addr + quantity) <= MAX_DISCRETE_INPUTS) {
+
+        uint8_t txBuffer[256];
+
+        // 3. Hitung Jumlah Byte Data (Pembulatan ke atas)
+        uint8_t byte_count = (quantity + 7) / 8;
+
+        // 4. Siapkan Header Balasan Modbus
+        txBuffer[0] = rxBufferInput[0]; // Slave ID
+        txBuffer[1] = 0x02;             // Function Code: 02 (Read Discrete Inputs)
+        txBuffer[2] = byte_count;       // Jumlah Byte Data
+
+        // 5. Nol-kan area data
+        for (uint8_t i = 0; i < byte_count; i++) {
+            txBuffer[3 + i] = 0x00;
+        }
+
+        // 6. Loop Bit-Packing (Langsung baca dari pin Hardware!)
+        for (uint16_t i = 0; i < quantity; i++) {
+
+            // Panggil Router GPIO
+            bool pin_status = Baca_Discrete_Input(start_addr + i);
+
+            if (pin_status == true) {
+                uint8_t byte_index = i / 8;
+                uint8_t bit_index  = i % 8;
+
+                txBuffer[3 + byte_index] |= (1 << bit_index);
+            }
+        }
+
+        // 7. Kalkulasi dan Pasang CRC16
+        uint16_t crc_tx = Hitung_CRC16(txBuffer, 3 + byte_count);
+        txBuffer[3 + byte_count] = crc_tx & 0xFF;         // CRC Low
+        txBuffer[4 + byte_count] = (crc_tx >> 8) & 0xFF;  // CRC High
+
+        // 8. Kirim Balasan ke HMI
+        vTaskDelay(pdMS_TO_TICKS(5));
+        HAL_UART_Transmit(&huart1, txBuffer, 5 + byte_count, 100);
+
+    } else {
+        // HMI meminta alamat di luar batas Hardware yang ada
+        Send_Modbus_Exception(rxBufferInput[0], 0x02, MODBUS_EXCEPTION_ILLEGAL_ADDRESS);
+    }
+}
+
+bool Baca_Discrete_Input(uint16_t input_addr) {
+    switch (input_addr) {
+
+        case DI_LIMIT_SWITCH_X:
+            // Asumsi Limit Switch menggunakan konfigurasi Active-Low (Ditekan = GND / RESET)
+            return (HAL_GPIO_ReadPin(LIMIT_X_GPIO_Port, LIMIT_X_Pin) == LIMIT_X_Pressed);
+
+        case DI_LIMIT_SWITCH_Y:
+            return (HAL_GPIO_ReadPin(LIMIT_Y_GPIO_Port, LIMIT_Y_Pin) == LIMIT_Y_Pressed);
+
+        case DI_LIMIT_SWITCH_Z:
+            return (HAL_GPIO_ReadPin(LIMIT_Z_GPIO_Port, LIMIT_Z_Pin) == LIMIT_Z_Pressed);
+
+        default:
+            return false; // Jika alamat tidak terdaftar
+    }
+}
+
 
 // -----------------------------------------------------
 // FUNC 0x03: READ HOLDING REGISTERS
@@ -417,3 +505,4 @@ void Send_Modbus_Exception(uint8_t slave_id, uint8_t function_code, uint8_t exce
     vTaskDelay(pdMS_TO_TICKS(5));
     HAL_UART_Transmit(&huart1, txBuffer, 5, 100);
 }
+
