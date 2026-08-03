@@ -25,10 +25,11 @@ enum ModbusCoilAddress {
     COIL_REQUEST_HOMING  = 0x0002,
     COIL_PAUSE_RESUME    = 0x0003,
     COIL_MANUAL_JOG      = 0x0004,
-    COIL_SAVE_TO_FLASH   = 0x0005,
-    COIL_RESET_SYSTEM    = 0x0006,
 
-	MAX_COILS_READABLE   = 5
+    COIL_SAVE_TO_FLASH   = 0x00010,
+    COIL_RESET_SYSTEM    = 0x00011,
+
+	MAX_COILS_READABLE   = 10
 };
 
 enum FunctionCode {
