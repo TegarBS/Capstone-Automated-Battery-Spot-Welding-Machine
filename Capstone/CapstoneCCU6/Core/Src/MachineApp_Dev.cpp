@@ -134,6 +134,16 @@ void Task_Sequencer(void *pvParameters) {
         // =========================================================
         if (isAutoWeldActive) {
 
+        	if (configLas.startKolom > configLas.totalKolom || configLas.startBaris > configLas.totalBaris) {
+				// Paksa kembali ke 0 jika operator memasukkan angka tidak masuk akal
+				indexKolomAktual = 0;
+				indexBarisAktual = 0;
+			} else {
+				// Gunakan nilai custom
+				indexKolomAktual = configLas.startKolom;
+				indexBarisAktual = configLas.totalBaris;
+			}
+
         	if (!isMachineHomed) {
 				flagMintaHoming = true; // Angkat bendera minta Homing
 				continue; // Lempar kembali ke atas loop, biarkan Blok B bekerja duluan!
@@ -380,6 +390,9 @@ void Task_Monitor(void *pvParameters) {
             Input_Registers[1] = (currentX_mm >> 16) & 0xFFFF;
             Input_Registers[2] = currentY_mm & 0xFFFF;
             Input_Registers[3] = (currentY_mm >> 16) & 0xFFFF;
+
+            Input_Registers[4] = indexKolomAktual + 1;
+            Input_Registers[5] = indexBarisAktual + 1;
         }
 
         // --- 2. KEDIP LED INDIKATOR RTOS ---

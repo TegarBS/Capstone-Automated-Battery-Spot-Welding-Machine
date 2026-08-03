@@ -86,6 +86,8 @@ typedef struct {
     uint16_t totalBaris;
     float pitchX;
     float pitchY;
+    uint16_t startKolom;       // Reg 6 (Index awal X)
+    uint16_t startBaris;
 } MesinConfig_t;
 
 extern const uint8_t ACK_OK;

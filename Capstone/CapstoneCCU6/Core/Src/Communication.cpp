@@ -14,9 +14,10 @@
 
 // --- Konstanta Modbus ---
 const uint16_t MODBUS_COIL_ON = 0xFF00;
-const uint8_t  MODBUS_EXCEPTION_ILLEGAL_ADDRESS  = 0x02; // Alamat tidak ditemukan
-const uint8_t  MODBUS_EXCEPTION_BUSY             = 0x06; // Perangkat sibuk
-const uint8_t  MODBUS_EXCEPTION_ILLEGAL_FUNCTION = 0x01; // Illegal Function
+const uint8_t  MODBUS_EXCEPTION_ILLEGAL_ADDRESS    = 0x02; // Alamat tidak ditemukan
+const uint8_t  MODBUS_EXCEPTION_BUSY               = 0x06; // Perangkat sibuk
+const uint8_t  MODBUS_EXCEPTION_ILLEGAL_FUNCTION   = 0x01; // Illegal Function
+const uint8_t  MODBUS_EXCEPTION_ILLEGAL_DATA_VALUE = 0x03;
 
 // --- Daftar Alamat Coil ---
 enum ModbusCoilAddress {
@@ -344,7 +345,7 @@ void Function_Code_04_READ_INPUT_REGISTER(uint8_t* rxBufferInput, uint8_t len) {
     uint16_t quantity   = (rxBufferInput[4] << 8) | rxBufferInput[5];
 
     // Asumsi TOTAL_INPUT_REGISTERS didefinisikan sebagai macro (misal: 10)
-    if (start_addr + quantity <= 10) {
+    if (start_addr + quantity <= TOTAL_INPUT_REGISTER) {
         uint8_t txBuffer[32];
         uint8_t byte_count = quantity * 2;
 
@@ -465,8 +466,31 @@ void Function_Code_06_WRITE_SINGLE_REGISTER(uint8_t* rxBufferInput, uint8_t len)
         switch (alamat_offset) {
             case 0: configLas.totalKolom = data_baru; break;
             case 1: configLas.totalBaris = data_baru; break;
-            case 2: configLas.pitchX = (float)data_baru / 10.0f; break;
-            case 3: configLas.pitchY = (float)data_baru / 10.0f; break;
+            case 2: // Jarak Pitch X
+				if (data_baru == 0) {
+					// Kirim Exception 0x03 (Illegal Data Value)
+					// Asumsi: rxBuffer[0] = Slave ID, rxBuffer[1] = Function Code (0x06 atau 0x10)
+					Send_Modbus_Exception(rxBuffer[0], 0x06, MODBUS_EXCEPTION_ILLEGAL_DATA_VALUE);
+					return; // SANGAT PENTING: Langsung keluar dari fungsi, batalkan proses Write!
+				}
+				configLas.pitchX = (float)data_baru / 10.0f;
+				break;
+
+			case 3: // Jarak Pitch Y
+				if (data_baru == 0) {
+					Send_Modbus_Exception(rxBuffer[0], 0x06, MODBUS_EXCEPTION_ILLEGAL_DATA_VALUE);
+					return; // Batal simpan dan keluar
+				}
+				configLas.pitchY = (float)data_baru / 10.0f;
+				break;
+
+            case 4:
+				configLas.startKolom = (data_baru > 0) ? (data_baru - 1) : 0;
+				break;
+
+			case 5:
+				configLas.startBaris = (data_baru > 0) ? (data_baru - 1) : 0;
+				break;
             default: break;
         }
 

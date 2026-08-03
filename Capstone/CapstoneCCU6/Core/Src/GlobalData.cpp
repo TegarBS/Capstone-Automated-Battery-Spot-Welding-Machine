@@ -61,7 +61,7 @@ uint8_t rxIndex = 0;
 // =========================================================
 // Tracker CAM Zig-Zag
 // =========================================================
-MesinConfig_t configLas = {0, 0, 0.0f, 0.0f};
+MesinConfig_t configLas = {0, 0, 0.0f, 0.0f, 0, 0};
 uint16_t indexKolomAktual = 0;
 uint16_t indexBarisAktual = 0;
 
