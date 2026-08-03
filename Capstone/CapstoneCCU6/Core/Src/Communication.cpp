@@ -26,7 +26,18 @@ enum ModbusCoilAddress {
     COIL_PAUSE_RESUME    = 0x0003,
     COIL_MANUAL_JOG      = 0x0004,
     COIL_SAVE_TO_FLASH   = 0x0005,
-    COIL_RESET_SYSTEM    = 0x0006
+    COIL_RESET_SYSTEM    = 0x0006,
+
+	MAX_COILS_READABLE   = 5
+};
+
+enum FunctionCode {
+    READ_COIL              = 0x01,
+    READ_DISCRETE_INPUT    = 0x02,
+    READ_HOLDING_REGISTER  = 0x03,
+    READ_INPUT_REGISTER    = 0x04,
+    WRITE_SINGLE_COIL      = 0x05,
+    WRITE_SINGLE_REGISTER  = 0x06
 };
 
 // =========================================================
@@ -54,20 +65,23 @@ void Task_Komunikasi(void *pvParameters) {
 
             // 3. Modbus Function Router
             switch (function_code) {
-				case 0x03:
-						Function_Code_03(rxBuffer, len);
-						break;
+				case READ_COIL:
+					Function_Code_01_READ_COILS(rxBuffer, len);
+					break;
+				case READ_HOLDING_REGISTER:
+					Function_Code_03_READ_HOLDING_REGISTER(rxBuffer, len);
+					break;
 
-				case 0x04:
-						Function_Code_04(rxBuffer, len);
-						break;
+				case READ_INPUT_REGISTER:
+					Function_Code_04_READ_INPUT_REGISTER(rxBuffer, len);
+					break;
 
-                case 0x05:
-                	Function_Code_05(rxBuffer, len);
+                case WRITE_SINGLE_COIL:
+                	Function_Code_05_WRITE_SINGLE_COIL(rxBuffer, len);
                     break;
 
-                case 0x06:
-                	Function_Code_06(rxBuffer, len);
+                case WRITE_SINGLE_REGISTER:
+                	Function_Code_06_WRITE_SINGLE_REGISTER(rxBuffer, len);
                     break;
 
                 default:
@@ -106,9 +120,89 @@ extern "C" void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 }
 
 // -----------------------------------------------------
+// FUNC 0x01: READ COILS
+// -----------------------------------------------------
+void Function_Code_01_READ_COILS(uint8_t* rxBufferInput, uint8_t len) {
+    // 1. Ambil Alamat Awal dan Jumlah Coil yang diminta HMI
+    uint16_t start_addr = (rxBufferInput[2] << 8) | rxBufferInput[3];
+    uint16_t quantity   = (rxBufferInput[4] << 8) | rxBufferInput[5];
+
+    // 2. Validasi Batas Alamat (Gunakan MAX_COILS dari enum kita sebelumnya)
+    if ((start_addr + quantity) <= MAX_COILS_READABLE) {
+
+        uint8_t txBuffer[256];
+
+        // 3. Hitung Jumlah Byte Data
+        // Rumus membagi 8 dengan pembulatan ke atas (ceiling)
+        uint8_t byte_count = (quantity + 7) / 8;
+
+        // 4. Siapkan Header Balasan Modbus
+        txBuffer[0] = rxBufferInput[0]; // Slave ID
+        txBuffer[1] = 0x01;             // Function Code: 01 (Read Coils)
+        txBuffer[2] = byte_count;       // Jumlah Byte Data
+
+        // 5. Kosongkan (Nol-kan) area data sebelum diisi (Sangat Penting!)
+        for (uint8_t i = 0; i < byte_count; i++) {
+            txBuffer[3 + i] = 0x00;
+        }
+
+        // 6. Loop sebanyak kuantitas coil dan Lakukan "BIT PACKING"
+        for (uint16_t i = 0; i < quantity; i++) {
+
+            // Panggil fungsi Router yang sudah kita buat sebelumnya
+            bool coil_status = Baca_Status_Coil(start_addr + i);
+
+            if (coil_status == true) {
+                // Tentukan lokasi byte dan bit ke berapa coil ini harus ditanam
+                uint8_t byte_index = i / 8; // Contoh: i=9 -> masuk ke Byte indeks 1
+                uint8_t bit_index  = i % 8; // Contoh: i=9 -> masuk ke Bit indeks 1
+
+                // Gunakan operator Bitwise OR (|) untuk menghidupkan bit tertentu
+                txBuffer[3 + byte_index] |= (1 << bit_index);
+            }
+        }
+
+        // 7. Kalkulasi dan Pasang CRC16
+        uint16_t crc_tx = Hitung_CRC16(txBuffer, 3 + byte_count);
+        txBuffer[3 + byte_count] = crc_tx & 0xFF;         // CRC Low
+        txBuffer[4 + byte_count] = (crc_tx >> 8) & 0xFF;  // CRC High
+
+        // 8. Kirim Balasan ke HMI via RS485
+        vTaskDelay(pdMS_TO_TICKS(5));
+        HAL_UART_Transmit(&huart1, txBuffer, 5 + byte_count, 100);
+
+    } else {
+        // HMI meminta alamat di luar batas (Misal minta Coil ke-99)
+        Send_Modbus_Exception(rxBufferInput[0], 0x01, MODBUS_EXCEPTION_ILLEGAL_ADDRESS);
+    }
+}
+
+bool Baca_Status_Coil(uint16_t coil_addr) {
+    switch (coil_addr) {
+        case COIL_START_AUTO_WELD:
+            return isAutoWeldActive;   // Variabel global dari FSM Anda
+
+        case COIL_EMERGENCY_STOP:
+            return isAborted;          // Variabel E-Stop
+
+        case COIL_REQUEST_HOMING:
+            return flagMintaHoming;
+
+        case COIL_PAUSE_RESUME:
+            return isPaused;
+
+        case COIL_MANUAL_JOG:
+            return flagManualJog;
+
+        default:
+            return false; // Alamat tidak valid
+    }
+}
+
+// -----------------------------------------------------
 // FUNC 0x03: READ HOLDING REGISTERS
 // -----------------------------------------------------
-void Function_Code_03(uint8_t* rxBufferInput, uint8_t len) {
+void Function_Code_03_READ_HOLDING_REGISTER(uint8_t* rxBufferInput, uint8_t len) {
     uint16_t start_addr = (rxBufferInput[2] << 8) | rxBufferInput[3];
     uint16_t quantity   = (rxBufferInput[4] << 8) | rxBufferInput[5]; // Typo diperbaiki
 
@@ -150,7 +244,7 @@ void Function_Code_03(uint8_t* rxBufferInput, uint8_t len) {
 // -----------------------------------------------------
 // FUNC 0x04: READ INPUT REGISTERS (Monitor Posisi X & Y)
 // -----------------------------------------------------
-void Function_Code_04(uint8_t* rxBufferInput, uint8_t len) {
+void Function_Code_04_READ_INPUT_REGISTER(uint8_t* rxBufferInput, uint8_t len) {
     uint16_t start_addr = (rxBufferInput[2] << 8) | rxBufferInput[3];
     uint16_t quantity   = (rxBufferInput[4] << 8) | rxBufferInput[5];
 
@@ -183,7 +277,7 @@ void Function_Code_04(uint8_t* rxBufferInput, uint8_t len) {
 // -----------------------------------------------------
 // FUNC 0x05: WRITE SINGLE COIL (Tombol Aksi HMI)
 // -----------------------------------------------------
-void Function_Code_05(uint8_t* rxBufferInput, uint8_t len) {
+void Function_Code_05_WRITE_SINGLE_COIL(uint8_t* rxBufferInput, uint8_t len) {
     uint16_t coil_addr = (rxBufferInput[2] << 8) | rxBufferInput[3];
     uint16_t coil_val  = (rxBufferInput[4] << 8) | rxBufferInput[5];
 
@@ -252,7 +346,7 @@ void Function_Code_05(uint8_t* rxBufferInput, uint8_t len) {
 // -----------------------------------------------------
 // FUNC 0x06: WRITE SINGLE REGISTER (Setting Mesin)
 // -----------------------------------------------------
-void Function_Code_06(uint8_t* rxBufferInput, uint8_t len) {
+void Function_Code_06_WRITE_SINGLE_REGISTER(uint8_t* rxBufferInput, uint8_t len) {
     uint16_t alamat_offset = (rxBufferInput[2] << 8) | rxBufferInput[3];
     uint16_t data_baru     = (rxBufferInput[4] << 8) | rxBufferInput[5];
 

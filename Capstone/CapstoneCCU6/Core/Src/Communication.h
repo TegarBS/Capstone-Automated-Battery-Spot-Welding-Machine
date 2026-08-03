@@ -10,10 +10,12 @@ extern "C" {
 // Fungsi Task & Kalkulasi Modbus
 void Task_Komunikasi(void *pvParameters);
 
-void Function_Code_03(uint8_t* rxBufferInput, uint8_t len);
-void Function_Code_04(uint8_t* rxBufferInput, uint8_t len);
-void Function_Code_05(uint8_t* rxBufferInput, uint8_t len);
-void Function_Code_06(uint8_t* rxBufferInput, uint8_t len);
+void Function_Code_01_READ_COILS(uint8_t* rxBufferInput, uint8_t len);
+bool Baca_Status_Coil(uint16_t coil_addr) ;
+void Function_Code_03_READ_HOLDING_REGISTER(uint8_t* rxBufferInput, uint8_t len);
+void Function_Code_04_READ_INPUT_REGISTER(uint8_t* rxBufferInput, uint8_t len);
+void Function_Code_05_WRITE_SINGLE_COIL(uint8_t* rxBufferInput, uint8_t len);
+void Function_Code_06_WRITE_SINGLE_REGISTER(uint8_t* rxBufferInput, uint8_t len);
 
 uint16_t Hitung_CRC16(const uint8_t *nData, uint16_t wLength);
 void Process_System_Reset(uint8_t* rxBuffer, uint16_t len);
