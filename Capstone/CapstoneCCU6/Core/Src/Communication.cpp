@@ -28,6 +28,8 @@ enum ModbusCoilAddress {
 
     COIL_SAVE_TO_FLASH   = 0x00010,
     COIL_RESET_SYSTEM    = 0x00011,
+	COIL_CMD_ZERO_Z      = 0x00012,
+	COIL_CMD_UNLOCK_Z    = 0x00013,
 
 	MAX_COILS_READABLE   = 10
 };
@@ -43,11 +45,12 @@ enum FunctionCode {
 
 // Kamus Alamat Modbus Discrete Inputs (Read-Only Hardware)
 enum ModbusDiscreteInput {
-    DI_LIMIT_SWITCH_X = 0x0000,
-    DI_LIMIT_SWITCH_Y = 0x0001,
-    DI_LIMIT_SWITCH_Z = 0x0002,
+    DI_LIMIT_SWITCH_X   = 0x0000,
+    DI_LIMIT_SWITCH_Y   = 0x0001,
+    DI_LIMIT_SWITCH_Z   = 0x0002,
+	DI_IS_MACHINE_HOMED = 0x0003,
 
-    MAX_DISCRETE_INPUTS = 3
+    MAX_DISCRETE_INPUTS = 4
 };
 
 // =========================================================
@@ -282,6 +285,9 @@ bool Baca_Discrete_Input(uint16_t input_addr) {
         case DI_LIMIT_SWITCH_Z:
             return (HAL_GPIO_ReadPin(LIMIT_Z_GPIO_Port, LIMIT_Z_Pin) == LIMIT_Z_Pressed);
 
+        case DI_IS_MACHINE_HOMED:
+            return isMachineHomed;
+
         default:
             return false; // Jika alamat tidak terdaftar
     }
@@ -420,6 +426,19 @@ void Function_Code_05_WRITE_SINGLE_COIL(uint8_t* rxBufferInput, uint8_t len) {
             }
             break;
 
+        case COIL_CMD_ZERO_Z:
+			if (coil_val == MODBUS_COIL_ON) {
+				motorZ->setAsHome();
+			}
+			break;
+
+        case COIL_CMD_UNLOCK_Z:
+			// Jika ditekan, cabut sabuk pengaman motor Z
+			if (coil_val == MODBUS_COIL_ON) {
+				motorZ->unlockPosition();
+			}
+			break;
+
         default:
             Send_Modbus_Exception(rxBufferInput[0], 0x05, MODBUS_EXCEPTION_ILLEGAL_ADDRESS);
             send_echo = false;
@@ -452,7 +471,7 @@ void Function_Code_06_WRITE_SINGLE_REGISTER(uint8_t* rxBufferInput, uint8_t len)
         }
 
         if (alamat_offset >= 20) {
-            Update_Motor_Speed_From_Settings();
+            Update_Motor_Param_From_Settings();
         }
 
         vTaskDelay(pdMS_TO_TICKS(5));

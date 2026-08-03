@@ -76,7 +76,7 @@ long Convert_mm_to_PulseZ(float target_mm) {
 // [FUNGSI UTILITAS: UPDATE PROFIL KECEPATAN DARI EEPROM]
 // Dipanggil 1x setelah booting, atau setiap kali HMI menekan "SAVE"
 // =========================================================
-void Update_Motor_Speed_From_Settings(void) {
+void Update_Motor_Param_From_Settings(void) {
     // ---------------------------------------------------------
     // 1. UPDATE PROFIL MOTOR X (Kalkulasi Hz independen)
     // ---------------------------------------------------------
@@ -113,9 +113,19 @@ void Update_Motor_Speed_From_Settings(void) {
     motorX->setInvertDirection(eepromSettings.directionX != 0);
 	motorY->setInvertDirection(eepromSettings.directionY != 0);
 	motorZ->setInvertDirection(eepromSettings.directionZ != 0);
+
+	// Konversi milimeter ke Pulse, lalu suntikkan ke Motor
+	long batasPulseX = Convert_mm_to_PulseX(eepromSettings.maxTravelX);
+	long batasPulseY = Convert_mm_to_PulseY(eepromSettings.maxTravelY);
+	long batasPulseZ = Convert_mm_to_PulseZ(eepromSettings.maxTravelZ);
+
+	motorX->setMaxPositionLimitPulse(batasPulseX);
+	motorY->setMaxPositionLimitPulse(batasPulseY);
+	motorZ->setMaxPositionLimitPulse(batasPulseZ);
 }
 
-void Update_Motor_Speed_Homing_From_Settings(void) {
+//Motor Z Tidak Homing
+void Update_Motor_Param_Homing_From_Settings(void) {
     // ---------------------------------------------------------
     // 1. UPDATE PROFIL MOTOR X (Kalkulasi Hz independen)
     // ---------------------------------------------------------

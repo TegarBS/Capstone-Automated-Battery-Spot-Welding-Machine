@@ -42,7 +42,7 @@ void MachineApp_Init(void) {
     xTaskCreate(Task_Komunikasi, "Task_Komunikasi", 512, NULL, 2, NULL);
     xTaskCreate(Task_Monitor, "Task_Mon", 256, NULL, 1, NULL);
 
-    Update_Motor_Speed_From_Settings();
+    Update_Motor_Param_From_Settings();
 
     // MENGHIDUPKAN JANTUNG MESIN
     HAL_UART_Receive_IT(&huart1, &rxChar, 1);
@@ -71,10 +71,13 @@ void Task_Sequencer(void *pvParameters) {
         // =========================================================
         if (flagMintaHoming) {
 
-        	Update_Motor_Speed_Homing_From_Settings();
+        	Update_Motor_Param_Homing_From_Settings();
 
 			// --- TAHAP 1: SEEK (Mencari Limit Switch dengan Pre-Flight Check) ---
 			isNavigating = true;
+
+			motorX->isHomed = false;
+			motorY->isHomed = false;
 
 			// Cek Sumbu X: Jika sudah tertekan dari awal, stop. Jika belum, mundur.
 			if (HAL_GPIO_ReadPin(LIMIT_X_GPIO_Port, LIMIT_X_Pin) == LIMIT_X_Pressed) {
@@ -119,7 +122,7 @@ void Task_Sequencer(void *pvParameters) {
 			motorX->resetPosition();
 			motorY->resetPosition();
 
-			Update_Motor_Speed_From_Settings();
+			Update_Motor_Param_From_Settings();
 
 			isMachineHomed = true;
             flagMintaHoming = false; // Matikan flag setelah selesai

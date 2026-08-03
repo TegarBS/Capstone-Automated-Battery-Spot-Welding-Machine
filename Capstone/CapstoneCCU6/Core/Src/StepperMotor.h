@@ -40,8 +40,11 @@ private:
 
     bool isMoving_flag;
 
+    long maxPositionLimitPulse;
+
 
 public:
+    bool isHomed;
     bool isMoving(void);
 
     // Constructor kini meminta input Hardware Timer
@@ -54,12 +57,16 @@ public:
     void setMaxSpeedHz(float inputMaxSpeedHz);
 	void setAccelHz(float inputAccelHz);
 
+	void setMaxPositionLimitPulse(long maxPulse);
+
     // Fungsi ini BUKAN dipanggil dari loop, tapi langsung oleh Interupsi Timer!
     void isr_update(void);
 
     void stop(void);
     void resetPosition(void);
     long getCurrentPositionPulse(void);
+    void setAsHome(void);
+    void unlockPosition(void);
 };
 
 #endif /* SRC_STEPPERMOTOR_H_ */

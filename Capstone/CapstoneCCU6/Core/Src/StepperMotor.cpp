@@ -20,6 +20,8 @@ StepperMotor::StepperMotor(GPIO_TypeDef* step_port, uint16_t step_pin, GPIO_Type
     invertDir = false;
     state = IDLE_STATE;
 
+    isHomed = true;
+
     // Inisialisasi Parameter Fisika
 	timerClock = 4000000;  // Pastikan sesuai dengan Prescaler di CubeMX
 
@@ -33,14 +35,45 @@ StepperMotor::StepperMotor(GPIO_TypeDef* step_port, uint16_t step_pin, GPIO_Type
 
     currentSpeedHz = 0;   // Frekuensi aktual saat ini
     deltaSpeedHz = 0;    	// Lonjakan frekuensi per langkah
+
+    maxPositionLimitPulse = 0;
+}
+
+void StepperMotor::setAsHome(void) {
+    currentPositionPulse = 0;
+    targetPositionPulse = 0;
+    isMoving_flag = false;
+
+    isHomed = true; // BOOM! Soft Limit Z langsung AKTIF dari titik ini!
+}
+
+void StepperMotor::unlockPosition(void) {
+    // Mematikan flag isHomed akan menonaktifkan Soft Limit di fungsi setTarget()
+    isHomed = false;
 }
 
 bool StepperMotor::isMoving(void) {
 	return isMoving_flag;
 }
 
+void StepperMotor::setMaxPositionLimitPulse(long maxPulse) {
+    maxPositionLimitPulse = maxPulse;
+}
+
 void StepperMotor::setTargetPulse(long target) {
     if (currentPositionPulse == target) return;
+
+    // -----------------------------------------------------
+	// CEK 1: SOFT LIMIT MINIMAL (Tidak boleh menabrak Limit Switch di titik Nol dan di atas Maksimal)
+	// -----------------------------------------------------
+    if (isHomed) {
+		if (target < 0) {
+			target = 0; // Kunci di titik nol
+		}
+		if (target > maxPositionLimitPulse) {
+			target = maxPositionLimitPulse; // Kunci di ujung rel
+		}
+	}
 
     targetPositionPulse = target;
     stepsToGo = abs(targetPositionPulse - currentPositionPulse);
@@ -162,6 +195,7 @@ void StepperMotor::resetPosition(void) {
     currentPositionPulse = 0;
     targetPositionPulse = 0;
     isMoving_flag = false;
+    isHomed = true;
     state = IDLE_STATE;
 }
 
