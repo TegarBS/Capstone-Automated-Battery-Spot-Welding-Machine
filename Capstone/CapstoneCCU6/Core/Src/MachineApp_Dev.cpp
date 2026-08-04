@@ -12,6 +12,7 @@
 #include "GlobalData.h"
 #include "UtilitasDanPerhitungan.h"
 #include "FungsiEEPROM.h"
+#include "Monitor.h"
 
 // Definisi Pin Fiktif untuk Relay dan Las
 #ifndef RELAY_Z_PORT
@@ -22,7 +23,6 @@
 #endif
 
 void Task_Sequencer(void *pvParameters);
-void Task_Monitor(void *pvParameters);
 
 
 // --- FUNGSI INISIALISASI MESIN ---
@@ -50,236 +50,227 @@ void MachineApp_Init(void) {
 
 void MachineApp_Loop(void) {}
 
-// --- TASK RTOS: Eksekutor Sekuensial Las (OTAK CAM) ---
 void Task_Sequencer(void *pvParameters) {
     vTaskDelay(pdMS_TO_TICKS(500)); // Jeda inisialisasi hardware
 
     while(1) {
         // =========================================================
-        // A. KONDISI DARURAT (ABORT)
+        // A. KONDISI DARURAT (ABORT / E-STOP)
         // =========================================================
         if (isAborted) {
             isAutoWeldActive = false; // Batalkan siklus otomatis
             isAborted = false;        // Reset bendera
             isMachineHomed = false;
+
             HAL_GPIO_WritePin(RELAY_Z_PORT, RELAY_Z_PIN, GPIO_PIN_RESET); // Naikkan pneumatik
             HAL_GPIO_WritePin(WELD_PORT, WELD_PIN, GPIO_PIN_RESET);       // Matikan trafo
+
+            // [HARDWARE ISR SEHARUSNYA SUDAH MEMATIKAN INI, TAPI KITA DOUBLE CHECK DI SINI]
+            motorX->stop();
+            motorY->stop();
+            motorZ->stop();
         }
 
         // =========================================================
         // B. FITUR HOMING MANDIRI (Pre-Flight Check + Pull Off)
         // =========================================================
-        if (flagMintaHoming) {
+        if (flagMintaHoming && !isAborted) {
 
-        	Update_Motor_Param_Homing_From_Settings();
+            Update_Motor_Param_Homing_From_Settings();
 
-			// --- TAHAP 1: SEEK (Mencari Limit Switch dengan Pre-Flight Check) ---
-			isNavigating = true;
+            // --- TAHAP 1: SEEK (Mencari Limit Switch) ---
+            isNavigating = true;
+            motorX->isHomed = false;
+            motorY->isHomed = false;
 
-			motorX->isHomed = false;
-			motorY->isHomed = false;
+            if (HAL_GPIO_ReadPin(LIMIT_X_GPIO_Port, LIMIT_X_Pin) == LIMIT_X_Pressed) {
+                motorX->stop();
+            } else {
+                motorX->setTargetPulse(-999999);
+            }
 
-			// Cek Sumbu X: Jika sudah tertekan dari awal, stop. Jika belum, mundur.
-			if (HAL_GPIO_ReadPin(LIMIT_X_GPIO_Port, LIMIT_X_Pin) == LIMIT_X_Pressed) {
-				motorX->stop();
-			} else {
-				motorX->setTargetPulse(-999999);
-			}
+            if (HAL_GPIO_ReadPin(LIMIT_Y_GPIO_Port, LIMIT_Y_Pin) == LIMIT_Y_Pressed) {
+                motorY->stop();
+            } else {
+                motorY->setTargetPulse(-999999);
+            }
 
-			// Cek Sumbu Y: Jika sudah tertekan dari awal, stop. Jika belum, mundur.
-			if (HAL_GPIO_ReadPin(LIMIT_Y_GPIO_Port, LIMIT_Y_Pin) == LIMIT_Y_Pressed) {
-				motorY->stop();
-			} else {
-				motorY->setTargetPulse(-999999);
-			}
+            // MENGHINDARI portMAX_DELAY: Tunggu dengan batas waktu (20ms) lalu absen
+            while (motorX->isMoving() || motorY->isMoving()) {
+                xSemaphoreTake(SinyalPosisiTercapai, pdMS_TO_TICKS(20));
+                heartbeat_Sequencer = true; // LAPOR MANDOR IWDG!
+                if (isAborted) break;       // Tembus seketika jika E-Stop ditekan
+            }
+            if (isAborted) continue; // Lempar ke Blok A
 
-			// Tunggu Semaphore HANYA JIKA ada motor yang benar-benar bergerak
-			if (motorX->isMoving() || motorY->isMoving()) {
-				xSemaphoreTake(SinyalPosisiTercapai, portMAX_DELAY);
-			}
+            motorX->resetPosition();
+            motorY->resetPosition();
 
-			// Reset koordinat sementara
-			motorX->resetPosition();
-			motorY->resetPosition();
+            // --- TAHAP 2: PULL-OFF (Maju sedikit) ---
+            ignoreLimitSwitch = true;
+            isNavigating = true;
 
+            motorX->setTargetPulse(Convert_mm_to_PulseX(eepromSettings.homingTravelAfterLimitX));
+            motorY->setTargetPulse(Convert_mm_to_PulseY(eepromSettings.homingTravelAfterLimitY));
 
-			// --- TAHAP 2: PULL-OFF (Maju sedikit agar sakelar terlepas) ---
-			ignoreLimitSwitch = true; // Matikan EXTI sementara agar aman dari getaran (bouncing)
-			isNavigating = true;
+            while (motorX->isMoving() || motorY->isMoving()) {
+                xSemaphoreTake(SinyalPosisiTercapai, pdMS_TO_TICKS(20));
+                heartbeat_Sequencer = true; // LAPOR MANDOR IWDG!
+                if (isAborted) break;
+            }
+            if (isAborted) continue;
 
-			// Maju sejauh 3200 step (Sesuaikan angkanya jika dirasa kurang jauh)
-			motorX->setTargetPulse(Convert_mm_to_PulseX(eepromSettings.homingTravelAfterLimitX));
-			motorY->setTargetPulse(Convert_mm_to_PulseY(eepromSettings.homingTravelAfterLimitY));
+            ignoreLimitSwitch = false;
 
-			// Tunggu sampai motor selesai maju
-			xSemaphoreTake(SinyalPosisiTercapai, portMAX_DELAY);
+            // --- TAHAP 3: TETAPKAN ZERO ABSOLUT ---
+            motorX->resetPosition();
+            motorY->resetPosition();
 
-			ignoreLimitSwitch = false; // Aktifkan kembali EXTI
+            Update_Motor_Param_From_Settings();
 
-
-			// --- TAHAP 3: TETAPKAN ZERO ABSOLUT ---
-			// Titik setelah mundur ini adalah titik (0,0) yang asli dan aman!
-			motorX->resetPosition();
-			motorY->resetPosition();
-
-			Update_Motor_Param_From_Settings();
-
-			isMachineHomed = true;
-            flagMintaHoming = false; // Matikan flag setelah selesai
-            continue; // Ulangi loop
-		}
+            isMachineHomed = true;
+            flagMintaHoming = false;
+            continue;
+        }
 
         // =========================================================
         // C. SIKLUS LAS OTOMATIS (Pola Zig-Zag)
         // =========================================================
-        if (isAutoWeldActive) {
+        if (isAutoWeldActive && !isAborted) {
 
-        	if (configLas.startKolom > configLas.totalKolom || configLas.startBaris > configLas.totalBaris) {
-				// Paksa kembali ke 0 jika operator memasukkan angka tidak masuk akal
-				indexKolomAktual = 0;
-				indexBarisAktual = 0;
-			} else {
-				// Gunakan nilai custom
-				indexKolomAktual = configLas.startKolom;
-				indexBarisAktual = configLas.totalBaris;
-			}
+            if (configLas.startKolom > configLas.totalKolom || configLas.startBaris > configLas.totalBaris) {
+                indexKolomAktual = 0;
+                indexBarisAktual = 0;
+            } else {
+                indexKolomAktual = configLas.startKolom;
+                // [BUG FIXED]: Sebelumnya Anda menulis configLas.totalBaris di sini
+                indexBarisAktual = configLas.startBaris;
+            }
 
-        	if (!isMachineHomed) {
-				flagMintaHoming = true; // Angkat bendera minta Homing
-				continue; // Lempar kembali ke atas loop, biarkan Blok B bekerja duluan!
-			}
-
-            // 1. Cek apakah seluruh pekerjaan sudah tuntas?
-            if (indexBarisAktual >= configLas.totalBaris) {
-                isAutoWeldActive = false; // Matikan mesin
+            if (!isMachineHomed) {
+                flagMintaHoming = true;
                 continue;
             }
 
-            // 2. CEK PAUSE
+            if (indexBarisAktual >= configLas.totalBaris) {
+                isAutoWeldActive = false;
+                continue;
+            }
+
+            // CEK PAUSE DENGAN WATCHDOG KICK
             while (isPaused && !isAborted) {
+                heartbeat_Sequencer = true; // LAPOR MANDOR
                 vTaskDelay(pdMS_TO_TICKS(50));
             }
             if (isAborted) continue;
 
-			// 3. KALKULASI TITIK PUSAT BATERAI SAAT INI
-			Koordinat_t center = CalculateBatteryCenter_mm();
+            Koordinat_t center = CalculateBatteryCenter_mm();
 
-			// =========================================================
-			// 4. MINI-LOOP: EKSEKUSI BEBERAPA TITIK DI 1 BATERAI
-			// =========================================================
-			for (uint16_t i = 0; i < eepromSettings.weldCount; i++) {
+            // =========================================================
+            // 4. MINI-LOOP: EKSEKUSI BEBERAPA TITIK DI 1 BATERAI
+            // =========================================================
+            for (uint16_t i = 0; i < eepromSettings.weldCount; i++) {
 
-				// A. Kalkulasi Pergeseran Simetris di SUMBU Y (Offset Vertikal)
-				// Jika jarum las sejajar sumbu X, kita menggeser Y agar membentuk KOTAK
-				float offsetY_mm = 0.0f;
-				if (eepromSettings.weldCount > 1) {
-					float spacing = (float)eepromSettings.spotSpacing_x10 / 10.0f;
-					float totalHeight = spacing * (eepromSettings.weldCount - 1);
-					// Mulai dari titik bawah, bergerak ke atas (atau sebaliknya)
-					float startY = -(totalHeight / 2.0f);
-					offsetY_mm = startY + (i * spacing);
-				}
+                float offsetY_mm = 0.0f;
+                if (eepromSettings.weldCount > 1) {
+                    float spacing = (float)eepromSettings.spotSpacing_x10 / 10.0f;
+                    float totalHeight = spacing * (eepromSettings.weldCount - 1);
+                    float startY = -(totalHeight / 2.0f);
+                    offsetY_mm = startY + (i * spacing);
+                }
 
-				// B. Konversi ke Pulse & Bergerak!
-				// Sumbu X tetap di titik tengah baterai, Sumbu Y yang ditambah pergeseran
-				long targetPulseX = Convert_mm_to_PulseX(center.x);
-				long targetPulseY = Convert_mm_to_PulseY(center.y + offsetY_mm);
+                long targetPulseX = Convert_mm_to_PulseX(center.x);
+                long targetPulseY = Convert_mm_to_PulseY(center.y + offsetY_mm);
 
-				isNavigating = true;
-				motorX->setTargetPulse(targetPulseX);
-				motorY->setTargetPulse(targetPulseY);
+                isNavigating = true;
+                motorX->setTargetPulse(targetPulseX);
+                motorY->setTargetPulse(targetPulseY);
 
-				if (motorX->isMoving() || motorY->isMoving()) {
-					xSemaphoreTake(SinyalPosisiTercapai, portMAX_DELAY);
-				} else {
-					isNavigating = false;
-				}
+                while (motorX->isMoving() || motorY->isMoving()) {
+                    xSemaphoreTake(SinyalPosisiTercapai, pdMS_TO_TICKS(20));
+                    heartbeat_Sequencer = true; // LAPOR MANDOR
+                    if (isAborted) break;
+                }
+                isNavigating = false;
+                if (isAborted) break;
 
-				// Pengecekan Darurat di tengah-tengah Mini-Loop
-				if (isAborted) break;
-				while (isPaused && !isAborted) vTaskDelay(pdMS_TO_TICKS(50));
-				if (isAborted) break;
+                // C. Proses Pengelasan
+                HAL_GPIO_WritePin(RELAY_Z_PORT, RELAY_Z_PIN, GPIO_PIN_SET);
 
-				// C. Proses Pengelasan (Menghasilkan 2 titik secara fisik karena 2 jarum X)
-				HAL_GPIO_WritePin(RELAY_Z_PORT, RELAY_Z_PIN, GPIO_PIN_SET);
-				vTaskDelay(pdMS_TO_TICKS(Holding_Registers[4])); // Drop Delay
+                // MENGHINDARI DELAY PANJANG: Potong jeda Drop Delay menjadi kepingan 10ms
+                uint16_t dropDelay = Holding_Registers[4];
+                for(uint16_t t = 0; t < dropDelay; t += 10) {
+                    vTaskDelay(pdMS_TO_TICKS(10));
+                    heartbeat_Sequencer = true;
+                    if(isAborted) break;
+                }
+                if (isAborted) break;
 
-				HAL_GPIO_WritePin(WELD_PORT, WELD_PIN, GPIO_PIN_SET);
-				vTaskDelay(pdMS_TO_TICKS(Holding_Registers[5])); // Weld Time
-				HAL_GPIO_WritePin(WELD_PORT, WELD_PIN, GPIO_PIN_RESET);
+                // Tembakan Las (Hanya dikontrol oleh STM32 Timer jika tidak pakai NE555)
+                HAL_GPIO_WritePin(WELD_PORT, WELD_PIN, GPIO_PIN_SET);
+                vTaskDelay(pdMS_TO_TICKS(Holding_Registers[5])); // Weld Time (Biasa < 50ms, aman dari IWDG)
+                HAL_GPIO_WritePin(WELD_PORT, WELD_PIN, GPIO_PIN_RESET);
 
-				HAL_GPIO_WritePin(RELAY_Z_PORT, RELAY_Z_PIN, GPIO_PIN_RESET);
-				vTaskDelay(pdMS_TO_TICKS(200)); // Waktu tunggu pneumatik naik sempurna
+                HAL_GPIO_WritePin(RELAY_Z_PORT, RELAY_Z_PIN, GPIO_PIN_RESET);
 
-				// Jeda sepersekian detik sebelum motor bergeser vertikal ke titik sebelahnya
-				vTaskDelay(pdMS_TO_TICKS(50));
-			}
+                // MENGHINDARI DELAY 200MS PANJANG (Waktu Tunggu Pneumatik Naik)
+                for(uint16_t t = 0; t < 200; t += 20) {
+                    vTaskDelay(pdMS_TO_TICKS(20));
+                    heartbeat_Sequencer = true;
+                    if(isAborted) break;
+                }
+            }
 
-			// Jika mesin dihentikan saat mini-loop berjalan, lompat siklus
-			if (isAborted) continue;
+            if (isAborted) continue;
 
-			// 6. UPDATE INDEX BATERAI
-			indexKolomAktual++;
+            // UPDATE INDEX BATERAI
+            indexKolomAktual++;
+            if (indexKolomAktual >= configLas.totalKolom) {
+                indexKolomAktual = 0;
+                indexBarisAktual++;
+            }
 
-			if (indexKolomAktual >= configLas.totalKolom) {
-				indexKolomAktual = 0;
-				indexBarisAktual++;
-			}
+        } else if (flagManualJog && !isAborted) {
+            // =========================================================
+            // D. MODE MANUAL JOG
+            // =========================================================
+            long jogManX_mm = (long)( ((uint32_t)Holding_Registers[7] << 16) | (uint32_t)Holding_Registers[6] );
+            long jogManY_mm = (long)( ((uint32_t)Holding_Registers[9] << 16) | (uint32_t)Holding_Registers[8] );
+            long jogManZ_mm = (long)( ((uint32_t)Holding_Registers[11] << 16) | (uint32_t)Holding_Registers[10] );
 
-			vTaskDelay(pdMS_TO_TICKS(10));
+            long targetAbsX = motorX->getCurrentPositionPulse() + Convert_mm_to_PulseX(jogManX_mm);
+            long targetAbsY = motorY->getCurrentPositionPulse() + Convert_mm_to_PulseY(jogManY_mm);
+            long targetAbsZ = motorZ->getCurrentPositionPulse() + Convert_mm_to_PulseZ(jogManZ_mm);
 
-        } else if (flagManualJog) {
-			// =========================================================
-			// D. MODE MANUAL JOG (Pergerakan Relatif / Incremental)
-			// =========================================================
+            isNavigating = true;
+            motorX->setTargetPulse(targetAbsX);
+            motorY->setTargetPulse(targetAbsY);
+            motorZ->setTargetPulse(targetAbsZ);
 
-			// 1. Ambil NILAI GESER (Relative Offset) 32-bit dari Modbus HMI
-			// Contoh: HMI mengirim -10 (mundur 10mm) atau 50 (maju 50mm)
-			long jogManX_mm = (long)( ((uint32_t)Holding_Registers[7] << 16) | (uint32_t)Holding_Registers[6] );
-			long jogManY_mm = (long)( ((uint32_t)Holding_Registers[9] << 16) | (uint32_t)Holding_Registers[8] );
-			long jogManZ_mm = (long)( ((uint32_t)Holding_Registers[11] << 16) | (uint32_t)Holding_Registers[10] );
+            while (motorX->isMoving() || motorY->isMoving() || motorZ->isMoving()) {
+                xSemaphoreTake(SinyalPosisiTercapai, pdMS_TO_TICKS(20));
+                heartbeat_Sequencer = true; // LAPOR MANDOR!
+                if (isAborted) break;
+            }
+            isNavigating = false;
 
-			// 2. Kalkulasi Target Absolut = Posisi Aktual Sekarang + Nilai Geser
-			// Kita konversi dulu jarak gesernya ke Pulse, lalu ditambahkan ke posisi mesin sekarang
-			long targetAbsX = motorX->getCurrentPositionPulse() + Convert_mm_to_PulseX(jogManX_mm);
-			long targetAbsY = motorY->getCurrentPositionPulse() + Convert_mm_to_PulseY(jogManY_mm);
-			long targetAbsZ = motorZ->getCurrentPositionPulse() + Convert_mm_to_PulseZ(jogManZ_mm);
+            if (isAborted) {
+                flagManualJog = false;
+                continue;
+            }
 
-			// 3. Suntikkan Target ke Penggerak Utama
-			isNavigating = true;
-			motorX->setTargetPulse(targetAbsX);
-			motorY->setTargetPulse(targetAbsY);
-			motorZ->setTargetPulse(targetAbsZ);
+            flagManualJog = false;
+            Holding_Registers[6] = 0; Holding_Registers[7] = 0;
+            Holding_Registers[8] = 0; Holding_Registers[9] = 0;
+            Holding_Registers[10] = 0; Holding_Registers[11] = 0;
 
-			// 4. Tunggu Motor Selesai Bergerak
-			if (motorX->isMoving() || motorY->isMoving() || motorZ->isMoving()) {
-				xSemaphoreTake(SinyalPosisiTercapai, portMAX_DELAY);
-			}
-
-			// Bebaskan status navigasi
-			isNavigating = false;
-
-			// 5. Cek Kondisi Darurat (Limit Switch / E-Stop saat Jogging)
-			if (isAborted) {
-				flagManualJog = false;
-				continue; // Ulangi loop dari atas untuk mengeksekusi E-Stop
-			}
-
-			// 6. Selesai Jogging, kembalikan ke mode standby
-			flagManualJog = false;
-
-			// [OPSIONAL TAPI DISARANKAN]: Nol-kan kembali register Modbus agar
-			// jika terjadi koneksi terputus, mesin tidak menyimpan angka sisa jog.
-			Holding_Registers[6] = 0; Holding_Registers[7] = 0;
-			Holding_Registers[8] = 0; Holding_Registers[9] = 0;
-			Holding_Registers[10] = 0; Holding_Registers[11] = 0;
-
-		} else {
-			// =========================================================
-			// E. MODE STANDBY PURE (Mesin nganggur menunggu perintah PC)
-			// =========================================================
-			vTaskDelay(pdMS_TO_TICKS(50));
-		}
+        } else {
+            // =========================================================
+            // E. MODE STANDBY PURE
+            // =========================================================
+            vTaskDelay(pdMS_TO_TICKS(50));
+            heartbeat_Sequencer = true; // ABSENSI WAJIB SAAT NGANGGUR!
+        }
     }
 }
 
@@ -365,47 +356,5 @@ extern "C" void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 }
 
 
-
-/**
- * Task monitoring lokasi real-time
- * Blinking LED untuk monitor kondisi STM32
- *
- */
-void Task_Monitor(void *pvParameters) {
-    uint32_t counter_led = 0;
-
-    while(1) {
-        // --- 1. UPDATE REGISTER MODBUS (MONITORING POSISI) ---
-        if (motorX && motorY) {
-            long currentX_pulse = motorX->getCurrentPositionPulse();
-            long currentY_pulse = motorY->getCurrentPositionPulse();
-
-            // KONVERSI KE MILIMETER DENGAN PRESISI x100
-            // Rumus: (Pulse * 100) / Steps_per_mm
-            long currentX_mm = (currentX_pulse * 100) / eepromSettings.stepsPerMmX;
-            long currentY_mm = (currentY_pulse * 100) / eepromSettings.stepsPerMmY;
-
-            // Pecah 32-bit (long) menjadi 2 bagian 16-bit untuk Input Register Modbus
-            Input_Registers[0] = currentX_mm & 0xFFFF;
-            Input_Registers[1] = (currentX_mm >> 16) & 0xFFFF;
-            Input_Registers[2] = currentY_mm & 0xFFFF;
-            Input_Registers[3] = (currentY_mm >> 16) & 0xFFFF;
-
-            Input_Registers[4] = indexKolomAktual + 1;
-            Input_Registers[5] = indexBarisAktual + 1;
-        }
-
-        // --- 2. KEDIP LED INDIKATOR RTOS ---
-        counter_led++;
-        // Task berjalan tiap 100ms. 100ms x 10 = 1000ms (1 Detik)
-        if (counter_led >= 10) {
-            HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
-            counter_led = 0;
-        }
-
-        // Tidurkan task selama 100 milidetik
-        vTaskDelay(pdMS_TO_TICKS(100));
-    }
-}
 
 

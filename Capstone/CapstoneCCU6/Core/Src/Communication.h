@@ -12,11 +12,16 @@ void Task_Komunikasi(void *pvParameters);
 
 void Function_Code_01_READ_COILS(uint8_t* rxBufferInput, uint8_t len);
 bool Baca_Status_Coil(uint16_t coil_addr) ;
+
 void Function_Code_02_READ_DISCRETE_INPUT(uint8_t* rxBufferInput, uint8_t len);
 bool Baca_Discrete_Input(uint16_t input_addr);
+
 void Function_Code_03_READ_HOLDING_REGISTER(uint8_t* rxBufferInput, uint8_t len);
+
 void Function_Code_04_READ_INPUT_REGISTER(uint8_t* rxBufferInput, uint8_t len);
+
 void Function_Code_05_WRITE_SINGLE_COIL(uint8_t* rxBufferInput, uint8_t len);
+
 void Function_Code_06_WRITE_SINGLE_REGISTER(uint8_t* rxBufferInput, uint8_t len);
 
 uint16_t Hitung_CRC16(const uint8_t *nData, uint16_t wLength);

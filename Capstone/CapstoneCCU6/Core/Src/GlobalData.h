@@ -148,4 +148,12 @@ extern TIM_HandleTypeDef htim2;
 extern TIM_HandleTypeDef htim3;
 extern TIM_HandleTypeDef htim4;
 
+extern IWDG_HandleTypeDef hiwdg;
+
+// =========================================================
+// Variabel "Detak Jantung" (Heartbeat) untuk setiap Task
+// =========================================================
+extern volatile bool heartbeat_Sequencer;
+extern volatile bool heartbeat_Komunikasi;
+
 #endif /* SRC_GLOBALDATA_H_ */

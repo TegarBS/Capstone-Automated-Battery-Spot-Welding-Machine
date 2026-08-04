@@ -62,7 +62,7 @@ void Task_Komunikasi(void *pvParameters) {
     const uint8_t SLAVE_ID = 0x01;
 
     while(1) {
-        if (xSemaphoreTake(Sem_DataDiterima, portMAX_DELAY) == pdTRUE) {
+        if (xSemaphoreTake(Sem_DataDiterima, pdMS_TO_TICKS(50)) == pdTRUE) {
 
             uint8_t len = rxIndex;
             rxIndex = 0; // Reset untuk paket berikutnya
@@ -108,6 +108,9 @@ void Task_Komunikasi(void *pvParameters) {
                     break;
             }
         }
+
+        else{}
+        heartbeat_Komunikasi = true;
     }
 }
 
@@ -377,14 +380,28 @@ void Function_Code_05_WRITE_SINGLE_COIL(uint8_t* rxBufferInput, uint8_t len) {
     uint16_t coil_addr = (rxBufferInput[2] << 8) | rxBufferInput[3];
     uint16_t coil_val  = (rxBufferInput[4] << 8) | rxBufferInput[5];
 
+    // Bendera penentu apakah STM32 akan mengirim balasan sukses (Echo)
     bool send_echo = true;
 
     switch (coil_addr) {
         case COIL_START_AUTO_WELD:
             if (coil_val == MODBUS_COIL_ON) {
-                indexKolomAktual = 0;
-                indexBarisAktual = 0;
+
+                // --- 1. PRE-FLIGHT CHECK (SABUK PENGAMAN) ---
+                if (configLas.totalKolom == 0 || configLas.totalBaris == 0 ||
+                    configLas.pitchX == 0.0f  || configLas.pitchY == 0.0f) {
+
+                    // Tolak eksekusi! Kirim Exception 0x03
+                    Send_Modbus_Exception(rxBufferInput[0], 0x05, MODBUS_EXCEPTION_ILLEGAL_DATA_VALUE);
+                    send_echo = false; // Batal kirim ACK
+                    break;             // Langsung lompat keluar dari blok case ini
+                }
+
                 isAutoWeldActive = true;
+
+            } else {
+                // Opsional: Jika HMI mengirim nilai OFF (0x0000) untuk mematikan mode Auto
+                isAutoWeldActive = false;
             }
             break;
 
@@ -428,30 +445,31 @@ void Function_Code_05_WRITE_SINGLE_COIL(uint8_t* rxBufferInput, uint8_t len) {
             break;
 
         case COIL_CMD_ZERO_Z:
-			if (coil_val == MODBUS_COIL_ON) {
-				motorZ->setAsHome();
-			}
-			break;
+            if (coil_val == MODBUS_COIL_ON) {
+                motorZ->setAsHome();
+            }
+            break;
 
         case COIL_CMD_UNLOCK_Z:
-			// Jika ditekan, cabut sabuk pengaman motor Z
-			if (coil_val == MODBUS_COIL_ON) {
-				motorZ->unlockPosition();
-			}
-			break;
+            // Cabut sabuk pengaman motor Z
+            if (coil_val == MODBUS_COIL_ON) {
+                motorZ->unlockPosition();
+            }
+            break;
 
         default:
+            // HMI menembak alamat Coil yang tidak terdaftar
             Send_Modbus_Exception(rxBufferInput[0], 0x05, MODBUS_EXCEPTION_ILLEGAL_ADDRESS);
             send_echo = false;
             break;
     }
 
+    // Hanya kirim Echo (ACK) jika semua proses aman dan tidak ada Exception
     if (send_echo) {
         vTaskDelay(pdMS_TO_TICKS(5));
         HAL_UART_Transmit(&huart1, rxBufferInput, len, 100);
     }
 }
-
 // -----------------------------------------------------
 // FUNC 0x06: WRITE SINGLE REGISTER (Setting Mesin)
 // -----------------------------------------------------
@@ -459,50 +477,82 @@ void Function_Code_06_WRITE_SINGLE_REGISTER(uint8_t* rxBufferInput, uint8_t len)
     uint16_t alamat_offset = (rxBufferInput[2] << 8) | rxBufferInput[3];
     uint16_t data_baru     = (rxBufferInput[4] << 8) | rxBufferInput[5];
 
-    if (alamat_offset < TOTAL_HOLDING_REGISTERS) {
+    // 1. Cek Batas Alamat Terlebih Dahulu
+    if (alamat_offset >= TOTAL_HOLDING_REGISTERS) {
+        Send_Modbus_Exception(rxBufferInput[0], 0x06, MODBUS_EXCEPTION_ILLEGAL_ADDRESS);
+        return; // Keluar, alamat tidak masuk akal
+    }
+
+    // 2. Siapkan Bendera Validasi (Default: True)
+    bool isDataValid = true;
+
+    // 3. Validasi dan Konversi Data Sesuai Alamatnya
+    switch (alamat_offset) {
+        case 0: // Total Kolom
+            if (data_baru == 0) {
+                // Tidak mungkin ada las baterai dengan 0 kolom
+                Send_Modbus_Exception(rxBufferInput[0], 0x06, MODBUS_EXCEPTION_ILLEGAL_DATA_VALUE);
+                isDataValid = false;
+            } else {
+                configLas.totalKolom = data_baru;
+            }
+            break;
+
+        case 1: // Total Baris
+            if (data_baru == 0) {
+                // Tidak mungkin ada las baterai dengan 0 baris
+                Send_Modbus_Exception(rxBufferInput[0], 0x06, MODBUS_EXCEPTION_ILLEGAL_DATA_VALUE);
+                isDataValid = false;
+            } else {
+                configLas.totalBaris = data_baru;
+            }
+            break;
+
+        case 2: // Jarak Pitch X
+            if (data_baru == 0) {
+                Send_Modbus_Exception(rxBufferInput[0], 0x06, MODBUS_EXCEPTION_ILLEGAL_DATA_VALUE);
+                isDataValid = false; // Tandai bahwa data ini cacat!
+            } else {
+                configLas.pitchX = (float)data_baru / 10.0f;
+            }
+            break;
+
+        case 3: // Jarak Pitch Y
+            if (data_baru == 0) {
+                Send_Modbus_Exception(rxBufferInput[0], 0x06, MODBUS_EXCEPTION_ILLEGAL_DATA_VALUE);
+                isDataValid = false; // Tandai cacat!
+            } else {
+                configLas.pitchY = (float)data_baru / 10.0f;
+            }
+            break;
+
+        case 4:
+            configLas.startKolom = (data_baru > 0) ? (data_baru - 1) : 0;
+            break;
+
+        case 5:
+            configLas.startBaris = (data_baru > 0) ? (data_baru - 1) : 0;
+            break;
+
+        default:
+            break; // Sisa register aman dan tidak perlu perlakuan khusus
+    }
+
+    // 4. JIKA DATA VALID: Baru Lakukan Penyimpanan dan Kirim ACK
+    if (isDataValid == true) {
+
+        // Simpan data mentah ke Holding Register (Aman, karena sudah terkurasi)
         Holding_Registers[alamat_offset] = data_baru;
 
-        // Gunakan switch-case agar sinkronisasi lebih rapi
-        switch (alamat_offset) {
-            case 0: configLas.totalKolom = data_baru; break;
-            case 1: configLas.totalBaris = data_baru; break;
-            case 2: // Jarak Pitch X
-				if (data_baru == 0) {
-					// Kirim Exception 0x03 (Illegal Data Value)
-					// Asumsi: rxBuffer[0] = Slave ID, rxBuffer[1] = Function Code (0x06 atau 0x10)
-					Send_Modbus_Exception(rxBuffer[0], 0x06, MODBUS_EXCEPTION_ILLEGAL_DATA_VALUE);
-					return; // SANGAT PENTING: Langsung keluar dari fungsi, batalkan proses Write!
-				}
-				configLas.pitchX = (float)data_baru / 10.0f;
-				break;
-
-			case 3: // Jarak Pitch Y
-				if (data_baru == 0) {
-					Send_Modbus_Exception(rxBuffer[0], 0x06, MODBUS_EXCEPTION_ILLEGAL_DATA_VALUE);
-					return; // Batal simpan dan keluar
-				}
-				configLas.pitchY = (float)data_baru / 10.0f;
-				break;
-
-            case 4:
-				configLas.startKolom = (data_baru > 0) ? (data_baru - 1) : 0;
-				break;
-
-			case 5:
-				configLas.startBaris = (data_baru > 0) ? (data_baru - 1) : 0;
-				break;
-            default: break;
-        }
-
+        // Jika yang diubah adalah parameter mekanik, update objek motor
         if (alamat_offset >= 20) {
             Update_Motor_Param_From_Settings();
         }
 
+        // Kirim Balasan Sukses (ACK)
+        // Di FC06, balasan sukses adalah mengirim ulang pesan request (Echo)
         vTaskDelay(pdMS_TO_TICKS(5));
         HAL_UART_Transmit(&huart1, rxBufferInput, len, 100);
-    } else {
-        // Alamat melebihi batas
-        Send_Modbus_Exception(rxBufferInput[0], 0x06, MODBUS_EXCEPTION_ILLEGAL_ADDRESS);
     }
 }
 

@@ -65,4 +65,10 @@ MesinConfig_t configLas = {0, 0, 0.0f, 0.0f, 0, 0};
 uint16_t indexKolomAktual = 0;
 uint16_t indexBarisAktual = 0;
 
+// =========================================================
+// Variabel "Detak Jantung" (Heartbeat) untuk setiap Task
+// =========================================================
+volatile bool heartbeat_Sequencer = false;
+volatile bool heartbeat_Komunikasi = false;
+
 
