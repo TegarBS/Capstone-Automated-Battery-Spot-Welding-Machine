@@ -14,9 +14,11 @@
  *
  */
 void Task_Monitor(void *pvParameters) {
-    uint32_t counter_led = 0;
+
+	uint32_t counter_led = 0;
 
     while(1) {
+
 
     	if (heartbeat_Sequencer == true && heartbeat_Komunikasi == true) {
 
@@ -27,7 +29,7 @@ void Task_Monitor(void *pvParameters) {
 	        counter_led++;
 	        // Task berjalan tiap 100ms. 100ms x 10 = 1000ms (1 Detik)
 	        if (counter_led >= 10) {
-	            HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+	            HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 	            counter_led = 0;
 	        }
 
@@ -63,8 +65,8 @@ void Task_Monitor(void *pvParameters) {
 
 
 
-        // Tidurkan task selama 100 milidetik
-        vTaskDelay(pdMS_TO_TICKS(100));
+        // Tidurkan task selama 50 milidetik
+        vTaskDelay(pdMS_TO_TICKS(50));
     }
 }
 

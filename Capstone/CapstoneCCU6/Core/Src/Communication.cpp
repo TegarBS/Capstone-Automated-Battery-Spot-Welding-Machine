@@ -14,9 +14,9 @@
 
 // --- Konstanta Modbus ---
 const uint16_t MODBUS_COIL_ON = 0xFF00;
-const uint8_t  MODBUS_EXCEPTION_ILLEGAL_ADDRESS    = 0x02; // Alamat tidak ditemukan
-const uint8_t  MODBUS_EXCEPTION_BUSY               = 0x06; // Perangkat sibuk
-const uint8_t  MODBUS_EXCEPTION_ILLEGAL_FUNCTION   = 0x01; // Illegal Function
+const uint8_t  MODBUS_EXCEPTION_ILLEGAL_ADDRESS    = 0x02;
+const uint8_t  MODBUS_EXCEPTION_BUSY               = 0x06;
+const uint8_t  MODBUS_EXCEPTION_ILLEGAL_FUNCTION   = 0x01;
 const uint8_t  MODBUS_EXCEPTION_ILLEGAL_DATA_VALUE = 0x03;
 
 // --- Daftar Alamat Coil ---
@@ -50,8 +50,9 @@ enum ModbusDiscreteInput {
     DI_LIMIT_SWITCH_Y   = 0x0001,
     DI_LIMIT_SWITCH_Z   = 0x0002,
 	DI_IS_MACHINE_HOMED = 0x0003,
+	DI_IS_MACHINE_RUN   = 0x0004,
 
-    MAX_DISCRETE_INPUTS = 4
+    MAX_DISCRETE_INPUTS = 10
 };
 
 // =========================================================
@@ -291,6 +292,9 @@ bool Baca_Discrete_Input(uint16_t input_addr) {
 
         case DI_IS_MACHINE_HOMED:
             return isMachineHomed;
+
+        case DI_IS_MACHINE_RUN:
+        	return HAL_GPIO_ReadPin(LED_GPIO_Port, LED_Pin) == GPIO_PIN_SET;
 
         default:
             return false; // Jika alamat tidak terdaftar

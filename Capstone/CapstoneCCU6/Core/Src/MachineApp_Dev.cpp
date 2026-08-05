@@ -58,7 +58,7 @@ void MachineApp_Init(void) {
 void MachineApp_Loop(void) {}
 
 void Task_Sequencer(void *pvParameters) {
-    vTaskDelay(pdMS_TO_TICKS(500)); // Jeda inisialisasi hardware
+	Delay_With_Watchdog(500); // Jeda inisialisasi hardware
 
     while(1) {
         if (isAborted) {
