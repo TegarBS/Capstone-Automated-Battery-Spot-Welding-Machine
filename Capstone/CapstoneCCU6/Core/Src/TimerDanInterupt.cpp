@@ -12,10 +12,16 @@
 // --- CALLBACK INTERUPSI PERANGKAT KERAS (ZERO-BLOCKING) ---
 extern "C" void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 
+	if (htim->Instance == TIM11) {
+		HAL_IncTick();
+		return; // LANGSUNG KELUAR! Jangan eksekusi logika motor di bawah.
+	}
+
     // 1. TANGANI KONDISI DARURAT (ABORT)
     if (isAborted) {
         if (motorX) motorX->stop(); // Fungsi stop() otomatis mematikan Hardware Timer
         if (motorY) motorY->stop();
+        if (motorZ) motorZ->stop();
         // Catatan: Semaphore akan otomatis dilepas di blok evaluasi di bawah
     }
 

@@ -96,6 +96,7 @@ int main(void)
   MX_TIM3_Init();
   MX_TIM4_Init();
   MX_IWDG_Init();
+  MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
   MachineApp_Init();
   /* USER CODE END 2 */
@@ -169,6 +170,15 @@ void SystemClock_Config(void)
 /* USER CODE BEGIN 4 */
 
 /* USER CODE END 4 */
+
+/**
+  * @brief  Period elapsed callback in non blocking mode
+  * @note   This function is called  when TIM11 interrupt took place, inside
+  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
+  * a global variable "uwTick" used as application time base.
+  * @param  htim : TIM handle
+  * @retval None
+  */
 
 /**
   * @brief  This function is executed in case of error occurrence.

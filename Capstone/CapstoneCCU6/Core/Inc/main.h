@@ -59,10 +59,18 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define LED_Pin GPIO_PIN_13
 #define LED_GPIO_Port GPIOC
-#define DIR_Z_Pin GPIO_PIN_0
-#define DIR_Z_GPIO_Port GPIOA
-#define STEP_Z_Pin GPIO_PIN_1
-#define STEP_Z_GPIO_Port GPIOA
+#define RELAY_UP_Pin GPIO_PIN_0
+#define RELAY_UP_GPIO_Port GPIOA
+#define RELAY_DOWN_Pin GPIO_PIN_1
+#define RELAY_DOWN_GPIO_Port GPIOA
+#define REED_TOP_Pin GPIO_PIN_3
+#define REED_TOP_GPIO_Port GPIOA
+#define REED_TOP_EXTI_IRQn EXTI3_IRQn
+#define REED_BOTTOM_Pin GPIO_PIN_4
+#define REED_BOTTOM_GPIO_Port GPIOA
+#define REED_BOTTOM_EXTI_IRQn EXTI4_IRQn
+#define LIMIT_CYL_Pin GPIO_PIN_5
+#define LIMIT_CYL_GPIO_Port GPIOA
 #define LIMIT_X_Pin GPIO_PIN_0
 #define LIMIT_X_GPIO_Port GPIOB
 #define LIMIT_X_EXTI_IRQn EXTI0_IRQn
@@ -80,10 +88,14 @@ void Error_Handler(void);
 #define DIR_Y_GPIO_Port GPIOB
 #define STEP_Y_Pin GPIO_PIN_15
 #define STEP_Y_GPIO_Port GPIOB
-#define DIR_ZB3_Pin GPIO_PIN_3
-#define DIR_ZB3_GPIO_Port GPIOB
-#define STEP_ZB4_Pin GPIO_PIN_4
-#define STEP_ZB4_GPIO_Port GPIOB
+#define DIR_Z_Pin GPIO_PIN_3
+#define DIR_Z_GPIO_Port GPIOB
+#define STEP_Z_Pin GPIO_PIN_4
+#define STEP_Z_GPIO_Port GPIOB
+#define WELD_EN_Pin GPIO_PIN_5
+#define WELD_EN_GPIO_Port GPIOB
+#define WELD_PULSE_Pin GPIO_PIN_6
+#define WELD_PULSE_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 
