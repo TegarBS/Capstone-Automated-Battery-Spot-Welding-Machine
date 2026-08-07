@@ -17,14 +17,11 @@ Koordinat_t CalculateBatteryCenter_mm(void) {
     float start_offset_Y = eepromSettings.Y_distance_from_0 / 10.0f; // Jarak aman Y dari limit switch (mm)
 
     // 1. Hitung Posisi Y (Selalu naik sesuai baris)
-    center.y = indexBarisAktual * configLas.pitchY + start_offset_Y;
+    center.y = (indexBarisAktual * configLas.pitchY) + start_offset_Y;
 
-    // 2. Hitung Posisi X dengan Pola ZIG-ZAG
-    if (indexBarisAktual % 2 == 0) {
-        center.x = (indexKolomAktual * configLas.pitchX) + start_offset_X;
-    } else {
-        center.x = ((configLas.totalKolom - 1 - indexKolomAktual) * configLas.pitchX) + start_offset_X;
-    }
+    // 2. Hitung Posisi X MUTLAK (Absolut Physical)
+	// Tidak perlu lagi if-else ganjil genap di sini!
+	center.x = (indexKolomAktual * configLas.pitchX) + start_offset_X;
 
     return center;
 }

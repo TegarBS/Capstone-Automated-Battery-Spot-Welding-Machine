@@ -161,7 +161,11 @@ void Perform_Homing_Sequence(void) {
     if (HAL_GPIO_ReadPin(LIMIT_Y_GPIO_Port, LIMIT_Y_Pin) == LIMIT_Y_Pressed) motorY->stop();
     else motorY->setTargetPulse(-999999);
 
-    if (!Wait_Motors_Reach_Target()) return; // Gagal / Batal
+    if (!Wait_Motors_Reach_Target()) {
+		isNavigating = false;
+		flagMintaHoming = false; // Batalkan niat homing
+		return; // Keluar dari fungsi ini SEKARANG JUGA!
+	} // Gagal / Batal
 
     motorX->resetPosition();
     motorY->resetPosition();
@@ -171,7 +175,11 @@ void Perform_Homing_Sequence(void) {
     motorX->setTargetPulse(Convert_mm_to_PulseX(eepromSettings.homingTravelAfterLimitX));
     motorY->setTargetPulse(Convert_mm_to_PulseY(eepromSettings.homingTravelAfterLimitY));
 
-    if (!Wait_Motors_Reach_Target()) return; // Gagal / Batal
+    if (!Wait_Motors_Reach_Target()) {
+		isNavigating = false;
+		flagMintaHoming = false; // Batalkan niat homing
+		return; // Keluar dari fungsi ini SEKARANG JUGA!
+	}
 
     ignoreLimitSwitch = false;
 
@@ -241,12 +249,33 @@ void Perform_Auto_Weld_Cycle(void) {
         Delay_With_Watchdog(500);
     }
 
-    // UPDATE INDEX BATERAI
-    indexKolomAktual++;
-    if (indexKolomAktual >= configLas.totalKolom) {
-        indexKolomAktual = 0;
-        indexBarisAktual++;
-    }
+	// 5. UPDATE INDEX BATERAI SELANJUTNYA (ZIG-ZAG FISIK)
+	if (indexBarisAktual % 2 == 0) {
+		// ---------------------------------------------------
+		// BARIS GENAP (0, 2, 4...): Mesin bergerak Kiri -> Kanan
+		// ---------------------------------------------------
+		if (indexKolomAktual < configLas.totalKolom - 1) {
+			indexKolomAktual++; // Lanjut bergeser ke kanan
+		} else {
+			// Sudah mentok di ujung KANAN
+			indexBarisAktual++; // Pindah baris (turun ke sumbu Y)
+			// PENTING: indexKolomAktual TIDAK di-nol-kan. Ia tetap di ujung kanan!
+		}
+
+	} else {
+
+		// ---------------------------------------------------
+		// BARIS GANJIL (1, 3, 5...): Mesin bergerak Kanan -> Kiri
+		// ---------------------------------------------------
+		if (indexKolomAktual > 0) {
+			indexKolomAktual--; // Lanjut bergeser ke kiri (Mundur)
+		} else {
+			// Sudah mentok di ujung KIRI
+			indexBarisAktual++; // Pindah baris (turun ke sumbu Y)
+			// PENTING: indexKolomAktual sudah bernilai 0 (ujung kiri). Biarkan saja!
+		}
+
+	}
 }
 
 void Perform_Manual_Jog(void) {
