@@ -110,10 +110,10 @@ class MesinLasHMI:
         self.btn_start_auto = tk.Button(frame_auto_btns, text="START AUTO", bg="green", fg="white", font=("Arial", 10, "bold"), command=self.start_auto_weld, state="disabled")
         self.btn_start_auto.pack(side="left", padx=5)
 
-        self.btn_pause_auto = tk.Button(frame_auto_btns, text="PAUSE", bg="orange", fg="black", font=("Arial", 10, "bold"), command=self.toggle_pause, state="disabled")
+        self.btn_pause_auto = tk.Button(frame_auto_btns, text="PAUSE", bg="orange", fg="black", font=("Arial", 10, "bold"), command=self.toggle_pause)
         self.btn_pause_auto.pack(side="left", padx=5)
 
-        self.btn_stop_auto = tk.Button(frame_auto_btns, text="EMERGENCY STOP", bg="red", fg="white", font=("Arial", 10, "bold"), command=self.stop_auto_weld, state="disabled")
+        self.btn_stop_auto = tk.Button(frame_auto_btns, text="EMERGENCY STOP", bg="red", fg="white", font=("Arial", 10, "bold"), command=self.stop_auto_weld)
         self.btn_stop_auto.pack(side="left", padx=5)
 
         # --- 4. FRAME LOG TERMINAL ---
@@ -269,8 +269,8 @@ class MesinLasHMI:
             self.is_welding = False
             self.is_paused = False
             self.btn_start_auto.config(state="normal")
-            self.btn_pause_auto.config(state="disabled")
-            self.btn_stop_auto.config(state="disabled")
+            self.btn_pause_auto.config(state="normal")
+            self.btn_stop_auto.config(state="normal")
             
             self.log_message("\n!!! ALARM: IWDG WATCHDOG RESET !!!")
             messagebox.showerror(
@@ -369,8 +369,8 @@ class MesinLasHMI:
                 # Kembalikan Tombol UI
                 self.btn_start_auto.config(state="normal")
                 self.btn_manual_home.config(state="normal")
-                self.btn_pause_auto.config(text="PAUSE", bg="orange", state="disabled")
-                self.btn_stop_auto.config(state="disabled")
+                self.btn_pause_auto.config(text="PAUSE", bg="orange", state="normal")
+                self.btn_stop_auto.config(state="normal")
                 
                 self.log_message("!!! PERINTAH EMERGENCY STOP DIKIRIM !!!")
             except Exception as e:
