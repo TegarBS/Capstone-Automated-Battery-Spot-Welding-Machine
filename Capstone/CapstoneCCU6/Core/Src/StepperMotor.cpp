@@ -61,24 +61,34 @@ void StepperMotor::setMaxPositionLimitPulse(long maxPulse) {
 }
 
 void StepperMotor::setTargetPulse(long target) {
-    if (currentPositionPulse == target) return;
 
-    // -----------------------------------------------------
-	// CEK 1: SOFT LIMIT MINIMAL (Tidak boleh menabrak Limit Switch di titik Nol dan di atas Maksimal)
-	// -----------------------------------------------------
+    // =====================================================
+	// 1. CEK SOFT LIMIT (Kunci target agar tidak menabrak)
+	// =====================================================
     if (isHomed) {
 		if (target < 0) {
-			target = 0; // Kunci di titik nol
+			target = 0; // Kunci di titik nol limit switch
 		}
 		if (target > maxPositionLimitPulse) {
-			target = maxPositionLimitPulse; // Kunci di ujung rel
+			target = maxPositionLimitPulse; // Kunci di ujung rel maksimal
 		}
 	}
 
+    // =====================================================
+    // 2. GUARD CLAUSE (Hentikan jika sudah di titik tujuan)
+    // =====================================================
+    // Wajib dieksekusi SETELAH soft limit dikalkulasi!
+    if (currentPositionPulse == target) {
+        return; // Keluar dari fungsi. Jangan nyalakan Timer/Flag!
+    }
+
+    // =====================================================
+    // 3. TERIMA TARGET & KALKULASI SISA LANGKAH
+    // =====================================================
     targetPositionPulse = target;
     stepsToGo = abs(targetPositionPulse - currentPositionPulse);
 
-    // 1. Tentukan Arah
+    // 4. Tentukan Arah Pin DIR
     if (targetPositionPulse > currentPositionPulse) {
         HAL_GPIO_WritePin(dirPort, dirPin, invertDir ? GPIO_PIN_RESET : GPIO_PIN_SET);
     } else {
@@ -86,7 +96,7 @@ void StepperMotor::setTargetPulse(long target) {
     }
 
     // =========================================================
-	// 2. KALKULASI JARAK AKSELERASI DINAMIS (Rumus GLBB)
+	// 5. KALKULASI JARAK AKSELERASI DINAMIS (Rumus GLBB)
 	// Rumus: s = (Vt^2 - V0^2) / 2a
 	// =========================================================
 	float delta_V_kuadrat = (maxSpeedHz * maxSpeedHz) - (minSpeedHz * minSpeedHz);
@@ -106,13 +116,15 @@ void StepperMotor::setTargetPulse(long target) {
 	if (accelSteps == 0) accelSteps = 1;
 
 	// =========================================================
-	// 3. HITUNG DELTA FREKUENSI (Kenaikan Hz per step)
+	// 6. HITUNG DELTA FREKUENSI (Kenaikan Hz per step)
 	// =========================================================
 	deltaSpeedHz = (maxSpeedHz - minSpeedHz) / (float)accelSteps;
 
-    // 4. Mulai Pergerakan dari Frekuensi Terendah
+    // 7. Mulai Pergerakan dari Frekuensi Terendah
     currentSpeedHz = minSpeedHz;
     state = ACCELERATING;
+
+    // NYALAKAN BENDERA (Karena stepsToGo dipastikan > 0)
     isMoving_flag = true;
 
     // Kalkulasi nilai ARR perdana dan jalankan timer

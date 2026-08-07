@@ -402,6 +402,7 @@ void Function_Code_05_WRITE_SINGLE_COIL(uint8_t* rxBufferInput, uint8_t len) {
                 }
 
                 isAutoWeldActive = true;
+                isFirstWeldCycle = true;
 
             } else {
                 // Opsional: Jika HMI mengirim nilai OFF (0x0000) untuk mematikan mode Auto

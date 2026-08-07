@@ -14,6 +14,8 @@
 #include "FungsiEEPROM.h"
 #include "Monitor.h"
 
+
+
 void Task_Sequencer(void *pvParameters);
 
 bool Wait_Motors_Reach_Target(bool includeZ);
@@ -34,6 +36,26 @@ void Perform_Manual_Jog(void);
 
 // --- FUNGSI INISIALISASI MESIN ---
 void MachineApp_Init(void) {
+	// -----------------------------------------------------
+	// DIAGNOSTIK PENYEBAB RESET (PRE-FLIGHT CHECK)
+	// -----------------------------------------------------
+	// 1. Cek apakah mesin baru saja di-reset oleh Watchdog
+	if (__HAL_RCC_GET_FLAG(RCC_FLAG_IWDGRST)) {
+		kode_alarm_sistem = 1; // Set alarm IWDG!
+	}
+	// 2. Cek apakah mesin di-reset oleh tombol fisik (Pin Reset)
+	else if (__HAL_RCC_GET_FLAG(RCC_FLAG_PINRST)) {
+		kode_alarm_sistem = 2;
+	}
+	// 3. Cek apakah mesin baru saja dicolok listrik (Power On Reset)
+	else if (__HAL_RCC_GET_FLAG(RCC_FLAG_PORRST)) {
+		kode_alarm_sistem = 3;
+	}
+
+	// WAJIB DILAKUKAN: Hapus bendera reset di memori hardware,
+	// jika tidak, status IWDG akan terus terbaca di reset berikutnya!
+	__HAL_RCC_CLEAR_RESET_FLAGS();
+
 	Load_Settings_From_Flash();
 
     motorX = new StepperMotor(STEP_X_GPIO_Port, STEP_X_Pin, DIR_X_GPIO_Port, DIR_X_Pin, &htim2);
@@ -163,12 +185,17 @@ void Perform_Homing_Sequence(void) {
 }
 
 void Perform_Auto_Weld_Cycle(void) {
-    if (configLas.startKolom > configLas.totalKolom || configLas.startBaris > configLas.totalBaris) {
-        indexKolomAktual = 0; indexBarisAktual = 0;
-    } else {
-        indexKolomAktual = configLas.startKolom;
-        indexBarisAktual = configLas.startBaris;
-    }
+	if (isFirstWeldCycle) {
+		if (configLas.startKolom > configLas.totalKolom || configLas.startBaris > configLas.totalBaris) {
+			indexKolomAktual = 0;
+			indexBarisAktual = 0;
+		} else {
+			indexKolomAktual = configLas.startKolom;
+			indexBarisAktual = configLas.startBaris;
+		}
+
+		isFirstWeldCycle = false; // GEMBOK PINTUNYA!
+	}
 
     if (!isMachineHomed) {
         flagMintaHoming = true; return;
@@ -211,6 +238,7 @@ void Perform_Auto_Weld_Cycle(void) {
 //
 //        HAL_GPIO_WritePin(RELAY_Z_PORT, RELAY_Z_PIN, GPIO_PIN_RESET);
 //        if (!Delay_With_Watchdog(200)) return; // Pneumatic Rise Delay
+        Delay_With_Watchdog(500);
     }
 
     // UPDATE INDEX BATERAI

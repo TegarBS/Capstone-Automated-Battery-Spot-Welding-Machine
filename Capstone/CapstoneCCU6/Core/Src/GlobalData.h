@@ -66,6 +66,9 @@ typedef struct __attribute__((aligned(4))){
     uint16_t weldCount;
     uint16_t spotSpacing_x10; //Jika ingin jarak 2.0mm, data dikirim bernilai 20
 
+    uint16_t X_distance_from_0;
+    uint16_t Y_distance_from_0;
+
 } PermanentSettings_t;
 
 extern PermanentSettings_t eepromSettings;
@@ -96,6 +99,8 @@ extern GPIO_PinState LIMIT_X_Pressed;
 extern GPIO_PinState LIMIT_Y_Pressed;
 extern GPIO_PinState LIMIT_Z_Pressed;
 
+extern uint16_t kode_alarm_sistem;
+
 // =========================================================
 // 2 [OBJEK & PERIPHERAL]
 // =========================================================
@@ -114,6 +119,7 @@ extern volatile bool flagMintaHoming;
 extern volatile bool isAutoWeldActive;
 extern volatile bool flagManualJog;
 extern volatile bool isMachineHomed;
+extern volatile bool isFirstWeldCycle;
 
 // =========================================================
 // [RTOS HANDLES]

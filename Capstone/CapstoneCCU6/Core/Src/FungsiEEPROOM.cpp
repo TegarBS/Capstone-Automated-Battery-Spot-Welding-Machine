@@ -101,12 +101,12 @@ void loadDefault(void){
     eepromSettings.magicNumber = MAGIC_NUMBER;
 
     eepromSettings.stepsPerMmX = 160;
-    eepromSettings.stepsPerMmY = 160;
+    eepromSettings.stepsPerMmY = 107;
     eepromSettings.stepsPerMmZ = 800;
 
     //Speed in mm/s
-    eepromSettings.maxSpeedX = 7500;
-    eepromSettings.maxSpeedY = 7500;
+    eepromSettings.maxSpeedX = 2500;
+    eepromSettings.maxSpeedY = 2500;
     eepromSettings.maxSpeedZ = 500;
 
     eepromSettings.minSpeedX = 500;
@@ -139,4 +139,7 @@ void loadDefault(void){
 
     eepromSettings.weldCount = 2;
     eepromSettings.spotSpacing_x10 = 15;
+
+    eepromSettings.X_distance_from_0 = 90;
+    eepromSettings.Y_distance_from_0 = 90;
 }

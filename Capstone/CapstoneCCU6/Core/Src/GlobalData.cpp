@@ -22,6 +22,15 @@ GPIO_PinState LIMIT_Y_Pressed = GPIO_PIN_SET;
 GPIO_PinState LIMIT_Z_Pressed = GPIO_PIN_SET;
 
 // =========================================================
+// VARIABEL GLOBAL STATUS & ALARM
+// =========================================================
+uint16_t kode_alarm_sistem = 0;
+// 0 = Normal / Sehat
+// 1 = IWDG Reset (Sistem Hang / EMI Strike!)
+// 2 = Pin Reset (Tombol Reset Fisik ditekan)
+// 3 = Power-On Reset (Baru dicolok listrik)
+
+// =========================================================
 // 2 [OBJEK & PERIPHERAL]
 // =========================================================
 StepperMotor* motorX = NULL;
@@ -39,6 +48,7 @@ volatile bool flagMintaHoming = false;
 volatile bool isAutoWeldActive = false;
 volatile bool flagManualJog = false;
 volatile bool isMachineHomed = false;
+volatile bool isFirstWeldCycle = false;
 
 // =========================================================
 // [RTOS HANDLES]

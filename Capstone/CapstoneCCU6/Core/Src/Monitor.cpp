@@ -40,7 +40,7 @@ void Task_Monitor(void *pvParameters) {
 		}
 
         // --- 1. UPDATE REGISTER MODBUS (MONITORING POSISI) ---
-        if (motorX && motorY) {
+        if (motorX && motorY && motorZ) {
             long currentX_pulse = motorX->getCurrentPositionPulse();
             long currentY_pulse = motorY->getCurrentPositionPulse();
             long currentZ_pulse = motorZ->getCurrentPositionPulse();
@@ -61,6 +61,8 @@ void Task_Monitor(void *pvParameters) {
 
             Input_Registers[7] = indexKolomAktual + 1;
             Input_Registers[8] = indexBarisAktual + 1;
+
+            Input_Registers[9] = kode_alarm_sistem;
         }
 
 
