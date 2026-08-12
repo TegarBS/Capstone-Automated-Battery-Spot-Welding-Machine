@@ -43,6 +43,6 @@ void Update_Motor_Param_Homing_From_Settings(void);
 // HELPER 2: Jeda Waktu (Delay) Aman dari Watchdog & E-Stop
 // Memecah delay panjang menjadi kepingan 10ms
 // ---------------------------------------------------------
-bool Delay_With_Watchdog(uint32_t total_delay_ms);
+bool Delay_With_Watchdog(uint32_t total_delay_ms, volatile bool &heartbeat);
 
 #endif /* SRC_UTILITASDANPERHITUNGAN_H_ */

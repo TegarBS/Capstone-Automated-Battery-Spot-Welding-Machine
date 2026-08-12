@@ -19,7 +19,6 @@
 void Task_Sequencer(void *pvParameters);
 
 bool Wait_Motors_Reach_Target(bool includeZ);
-bool Delay_With_Watchdog(uint32_t total_delay_ms);
 void Handle_Emergency_Abort(void);
 void Perform_Homing_Sequence(void);
 void Perform_Auto_Weld_Cycle(void);
@@ -79,7 +78,7 @@ void MachineApp_Init(void) {
 void MachineApp_Loop(void) {}
 
 void Task_Sequencer(void *pvParameters) {
-	Delay_With_Watchdog(500); // Jeda inisialisasi hardware
+	Delay_With_Watchdog(500, heartbeat_Sequencer); // Jeda inisialisasi hardware
 
     while(1) {
         if (isAborted) {
@@ -232,7 +231,7 @@ void Perform_Auto_Weld_Cycle(void) {
 //
 //        HAL_GPIO_WritePin(RELAY_Z_PORT, RELAY_Z_PIN, GPIO_PIN_RESET);
 //        if (!Delay_With_Watchdog(200)) return; // Pneumatic Rise Delay
-        Delay_With_Watchdog(500);
+        Delay_With_Watchdog(500, heartbeat_Sequencer);
     }
 
 	// 5. UPDATE INDEX BATERAI SELANJUTNYA (ZIG-ZAG FISIK)

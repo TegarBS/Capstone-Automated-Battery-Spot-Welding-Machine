@@ -60,7 +60,7 @@ enum ModbusDiscreteInput {
 // =========================================================
 void Task_Komunikasi(void *pvParameters) {
     // Definisi konstanta ID Slave agar tidak menggunakan magic number (0x01)
-	Delay_With_Watchdog(500);
+	Delay_With_Watchdog(500, heartbeat_Komunikasi);
     HAL_UART_Receive_IT(&huart1, &rxChar, 1);
     const uint8_t SLAVE_ID = 0x01;
 
@@ -212,7 +212,7 @@ void Function_Code_01_READ_COILS(uint8_t* rxBufferInput, uint8_t len) {
 
         // 8. Kirim Balasan ke HMI via RS485
         vTaskDelay(pdMS_TO_TICKS(5));
-        HAL_UART_Transmit_IT(&huart1, txBuffer, 5 + byte_count);
+        HAL_UART_Transmit(&huart1, txBuffer, 5 + byte_count,100);
 
     } else {
         // HMI meminta alamat di luar batas (Misal minta Coil ke-99)
@@ -289,7 +289,7 @@ void Function_Code_02_READ_DISCRETE_INPUT(uint8_t* rxBufferInput, uint8_t len) {
 
         // 8. Kirim Balasan ke HMI
         vTaskDelay(pdMS_TO_TICKS(5));
-        HAL_UART_Transmit_IT(&huart1, txBuffer, 5 + byte_count);
+        HAL_UART_Transmit(&huart1, txBuffer, 5 + byte_count,100);
 
     } else {
         // HMI meminta alamat di luar batas Hardware yang ada
@@ -356,7 +356,7 @@ void Function_Code_03_READ_HOLDING_REGISTER(uint8_t* rxBufferInput, uint8_t len)
         vTaskDelay(pdMS_TO_TICKS(5));
 
         // Kirim balasan ke HMI/PC
-        HAL_UART_Transmit_IT(&huart1, txBuffer, 5 + byte_count);
+        HAL_UART_Transmit(&huart1, txBuffer, 5 + byte_count,100);
 
     } else {
         // Alamat melebihi batas, kirim Exception 0x02 (Illegal Data Address)
@@ -390,7 +390,7 @@ void Function_Code_04_READ_INPUT_REGISTER(uint8_t* rxBufferInput, uint8_t len) {
         txBuffer[4 + byte_count] = (crc_tx >> 8) & 0xFF;
 
         vTaskDelay(pdMS_TO_TICKS(5));
-        HAL_UART_Transmit_IT(&huart1, txBuffer, 5 + byte_count);
+        HAL_UART_Transmit(&huart1, txBuffer, 5 + byte_count,100);
     } else {
         // Alamat melebihi batas, kirim Exception 0x02 (Illegal Data Address)
         Send_Modbus_Exception(rxBufferInput[0], 0x04, MODBUS_EXCEPTION_ILLEGAL_ADDRESS);
@@ -492,7 +492,7 @@ void Function_Code_05_WRITE_SINGLE_COIL(uint8_t* rxBufferInput, uint8_t len) {
     // Hanya kirim Echo (ACK) jika semua proses aman dan tidak ada Exception
     if (send_echo) {
         vTaskDelay(pdMS_TO_TICKS(5));
-        HAL_UART_Transmit_IT(&huart1, rxBufferInput, len);
+        HAL_UART_Transmit(&huart1, rxBufferInput, len,100);
     }
 }
 // -----------------------------------------------------
@@ -583,7 +583,7 @@ void Function_Code_06_WRITE_SINGLE_REGISTER(uint8_t* rxBufferInput, uint8_t len)
         // Kirim Balasan Sukses (ACK)
         // Di FC06, balasan sukses adalah mengirim ulang pesan request (Echo)
         vTaskDelay(pdMS_TO_TICKS(5));
-        HAL_UART_Transmit_IT(&huart1, rxBufferInput, len);
+        HAL_UART_Transmit(&huart1, rxBufferInput, len,100);
     }
 }
 

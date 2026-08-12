@@ -156,10 +156,10 @@ void Update_Motor_Param_Homing_From_Settings(void) {
 // HELPER 2: Jeda Waktu (Delay) Aman dari Watchdog & E-Stop
 // Memecah delay panjang menjadi kepingan 10ms
 // ---------------------------------------------------------
-bool Delay_With_Watchdog(uint32_t total_delay_ms) {
+bool Delay_With_Watchdog(uint32_t total_delay_ms, volatile bool &heartbeat) {
     for(uint32_t t = 0; t < total_delay_ms; t += 10) {
         vTaskDelay(pdMS_TO_TICKS(10));
-        heartbeat_Sequencer = true;
+        heartbeat = true;
         if (isAborted) return false;
     }
     return true;
