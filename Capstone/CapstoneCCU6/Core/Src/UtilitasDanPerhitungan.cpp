@@ -10,7 +10,7 @@
 // =========================================================
 // [FUNGSI OTAK CAM: PUSAT BATERAI (ZIG-ZAG)]
 // =========================================================
-Koordinat_t CalculateBatteryCenter_mm(void) {
+Koordinat_t Calculate_Battery_Center_mm(void) {
     Koordinat_t center;
 
     float start_offset_X = eepromSettings.X_distance_from_0 / 10.0f; // Jarak aman X dari limit switch (mm)
@@ -150,4 +150,17 @@ void Update_Motor_Param_Homing_From_Settings(void) {
 
     motorX->setInvertDirection(eepromSettings.directionX != 0);
 	motorY->setInvertDirection(eepromSettings.directionY != 0);
+}
+
+// ---------------------------------------------------------
+// HELPER 2: Jeda Waktu (Delay) Aman dari Watchdog & E-Stop
+// Memecah delay panjang menjadi kepingan 10ms
+// ---------------------------------------------------------
+bool Delay_With_Watchdog(uint32_t total_delay_ms) {
+    for(uint32_t t = 0; t < total_delay_ms; t += 10) {
+        vTaskDelay(pdMS_TO_TICKS(10));
+        heartbeat_Sequencer = true;
+        if (isAborted) return false;
+    }
+    return true;
 }

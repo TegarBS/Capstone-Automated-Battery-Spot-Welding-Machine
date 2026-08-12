@@ -60,6 +60,8 @@ enum ModbusDiscreteInput {
 // =========================================================
 void Task_Komunikasi(void *pvParameters) {
     // Definisi konstanta ID Slave agar tidak menggunakan magic number (0x01)
+	Delay_With_Watchdog(500);
+    HAL_UART_Receive_IT(&huart1, &rxChar, 1);
     const uint8_t SLAVE_ID = 0x01;
 
     while(1) {
@@ -142,6 +144,24 @@ extern "C" void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
     }
 }
 
+// =================================================================
+// CALLBACK JIKA TERJADI ERROR KOMUNIKASI (OVERRUN, NOISE, FRAMING)
+// =================================================================
+extern "C" void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
+    if (huart->Instance == USART1) { // Sesuaikan dengan USART yang Anda pakai
+
+        // 1. Bersihkan bendera error secara manual (Opsional tapi disarankan)
+        __HAL_UART_CLEAR_OREFLAG(huart);
+        __HAL_UART_CLEAR_FEFLAG(huart);
+        __HAL_UART_CLEAR_NEFLAG(huart);
+        __HAL_UART_CLEAR_PEFLAG(huart);
+
+        // 2. PAKSA STM32 UNTUK MENDENGARKAN KEMBALI!
+        // Tanpa baris ini, STM32 akan "tuli" selamanya setelah terkena noise.
+        HAL_UART_Receive_IT(&huart1, &rxChar, 1);
+    }
+}
+
 // -----------------------------------------------------
 // FUNC 0x01: READ COILS
 // -----------------------------------------------------
@@ -192,7 +212,7 @@ void Function_Code_01_READ_COILS(uint8_t* rxBufferInput, uint8_t len) {
 
         // 8. Kirim Balasan ke HMI via RS485
         vTaskDelay(pdMS_TO_TICKS(5));
-        HAL_UART_Transmit(&huart1, txBuffer, 5 + byte_count, 100);
+        HAL_UART_Transmit_IT(&huart1, txBuffer, 5 + byte_count);
 
     } else {
         // HMI meminta alamat di luar batas (Misal minta Coil ke-99)
@@ -269,7 +289,7 @@ void Function_Code_02_READ_DISCRETE_INPUT(uint8_t* rxBufferInput, uint8_t len) {
 
         // 8. Kirim Balasan ke HMI
         vTaskDelay(pdMS_TO_TICKS(5));
-        HAL_UART_Transmit(&huart1, txBuffer, 5 + byte_count, 100);
+        HAL_UART_Transmit_IT(&huart1, txBuffer, 5 + byte_count);
 
     } else {
         // HMI meminta alamat di luar batas Hardware yang ada
@@ -336,7 +356,7 @@ void Function_Code_03_READ_HOLDING_REGISTER(uint8_t* rxBufferInput, uint8_t len)
         vTaskDelay(pdMS_TO_TICKS(5));
 
         // Kirim balasan ke HMI/PC
-        HAL_UART_Transmit(&huart1, txBuffer, 5 + byte_count, 100);
+        HAL_UART_Transmit_IT(&huart1, txBuffer, 5 + byte_count);
 
     } else {
         // Alamat melebihi batas, kirim Exception 0x02 (Illegal Data Address)
@@ -370,7 +390,7 @@ void Function_Code_04_READ_INPUT_REGISTER(uint8_t* rxBufferInput, uint8_t len) {
         txBuffer[4 + byte_count] = (crc_tx >> 8) & 0xFF;
 
         vTaskDelay(pdMS_TO_TICKS(5));
-        HAL_UART_Transmit(&huart1, txBuffer, 5 + byte_count, 100);
+        HAL_UART_Transmit_IT(&huart1, txBuffer, 5 + byte_count);
     } else {
         // Alamat melebihi batas, kirim Exception 0x02 (Illegal Data Address)
         Send_Modbus_Exception(rxBufferInput[0], 0x04, MODBUS_EXCEPTION_ILLEGAL_ADDRESS);
@@ -472,7 +492,7 @@ void Function_Code_05_WRITE_SINGLE_COIL(uint8_t* rxBufferInput, uint8_t len) {
     // Hanya kirim Echo (ACK) jika semua proses aman dan tidak ada Exception
     if (send_echo) {
         vTaskDelay(pdMS_TO_TICKS(5));
-        HAL_UART_Transmit(&huart1, rxBufferInput, len, 100);
+        HAL_UART_Transmit_IT(&huart1, rxBufferInput, len);
     }
 }
 // -----------------------------------------------------
@@ -539,6 +559,10 @@ void Function_Code_06_WRITE_SINGLE_REGISTER(uint8_t* rxBufferInput, uint8_t len)
             configLas.startBaris = (data_baru > 0) ? (data_baru - 1) : 0;
             break;
 
+        case 12:
+        	kode_alarm_sistem = data_baru;
+        	break;
+
         default:
             break; // Sisa register aman dan tidak perlu perlakuan khusus
     }
@@ -551,13 +575,15 @@ void Function_Code_06_WRITE_SINGLE_REGISTER(uint8_t* rxBufferInput, uint8_t len)
 
         // Jika yang diubah adalah parameter mekanik, update objek motor
         if (alamat_offset >= 20) {
+        	Ambil_Data_Dari_Holding_Register();
+        	vTaskDelay(pdMS_TO_TICKS(2));
             Update_Motor_Param_From_Settings();
         }
 
         // Kirim Balasan Sukses (ACK)
         // Di FC06, balasan sukses adalah mengirim ulang pesan request (Echo)
         vTaskDelay(pdMS_TO_TICKS(5));
-        HAL_UART_Transmit(&huart1, rxBufferInput, len, 100);
+        HAL_UART_Transmit_IT(&huart1, rxBufferInput, len);
     }
 }
 

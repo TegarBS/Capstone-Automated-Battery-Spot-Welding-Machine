@@ -73,8 +73,7 @@ void MachineApp_Init(void) {
 
     Update_Motor_Param_From_Settings();
 
-    // MENGHIDUPKAN JANTUNG MESIN
-    HAL_UART_Receive_IT(&huart1, &rxChar, 1);
+
 }
 
 void MachineApp_Loop(void) {}
@@ -117,19 +116,6 @@ bool Wait_Motors_Reach_Target(bool includeZ = false) {
         heartbeat_Sequencer = true; // LAPOR MANDOR IWDG!
 
         if (isAborted) return false; // Tembus seketika jika E-Stop ditekan
-    }
-    return true;
-}
-
-// ---------------------------------------------------------
-// HELPER 2: Jeda Waktu (Delay) Aman dari Watchdog & E-Stop
-// Memecah delay panjang menjadi kepingan 10ms
-// ---------------------------------------------------------
-bool Delay_With_Watchdog(uint32_t total_delay_ms) {
-    for(uint32_t t = 0; t < total_delay_ms; t += 10) {
-        vTaskDelay(pdMS_TO_TICKS(10));
-        heartbeat_Sequencer = true;
-        if (isAborted) return false;
     }
     return true;
 }
@@ -219,7 +205,7 @@ void Perform_Auto_Weld_Cycle(void) {
     }
     if (isAborted) return;
 
-    Koordinat_t center = CalculateBatteryCenter_mm();
+    Koordinat_t center = Calculate_Battery_Center_mm();
 
     // MINI-LOOP
     for (uint16_t i = 0; i < eepromSettings.weldCount; i++) {

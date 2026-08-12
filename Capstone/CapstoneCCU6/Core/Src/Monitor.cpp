@@ -62,7 +62,8 @@ void Task_Monitor(void *pvParameters) {
             Input_Registers[7] = indexKolomAktual + 1;
             Input_Registers[8] = indexBarisAktual + 1;
 
-            Input_Registers[9] = kode_alarm_sistem;
+            // Alert ke HMI
+            Holding_Registers[12] = kode_alarm_sistem;
         }
 
 

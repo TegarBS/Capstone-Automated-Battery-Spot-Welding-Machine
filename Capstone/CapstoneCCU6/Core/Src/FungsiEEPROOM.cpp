@@ -22,11 +22,11 @@ void Load_Settings_From_Flash(void) {
         eepromSettings = *flashData;
     } else {
         // Jika Flash masih kosong / pabrikan, beri nilai Default!
-    	loadDefault();
+    	Load_Default_Value();
     }
 
     // Salin ke Modbus Holding Registers agar bisa dibaca oleh HMI saat konek pertama kali
-    salinDataKeRegister();
+    Salin_Data_Ke_Register();
 }
 
 // --- FUNGSI MENYIMPAN KE FLASH (DENGAN SAFETY INTERLOCK) ---
@@ -47,7 +47,7 @@ bool Save_Settings_To_Flash(void) {
     }
 
     // 2. Ambil data terbaru dari Holding Registers HMI
-    ambilDataDariRegister();
+    Ambil_Data_Dari_Holding_Register();
 
     // 3. MATIKAN SELURUH AKTIVITAS HARDWARE (GLOBAL DISABLE)
     __disable_irq();
@@ -82,13 +82,13 @@ bool Save_Settings_To_Flash(void) {
     return true; // Penyimpanan Berhasil
 }
 
-void salinDataKeRegister(void){
+void Salin_Data_Ke_Register(void){
 	memcpy(&Holding_Registers[EEPROM_START_MODBUS_REG],
 		   &eepromSettings.stepsPerMmX,
 		   TOTAL_EEPROM_PARAMS * sizeof(uint16_t));
 }
 
-void ambilDataDariRegister(void){
+void Ambil_Data_Dari_Holding_Register(void){
 	eepromSettings.magicNumber = MAGIC_NUMBER;
 
 	// Kopi 26 parameter sekaligus dari Array HMI masuk ke RAM mesin
@@ -97,10 +97,10 @@ void ambilDataDariRegister(void){
 		   TOTAL_EEPROM_PARAMS * sizeof(uint16_t));
 }
 
-void loadDefault(void){
+void Load_Default_Value(void){
     eepromSettings.magicNumber = MAGIC_NUMBER;
 
-    eepromSettings.stepsPerMmX = 160;
+    eepromSettings.stepsPerMmX = 80;
     eepromSettings.stepsPerMmY = 107;
     eepromSettings.stepsPerMmZ = 800;
 
@@ -133,7 +133,7 @@ void loadDefault(void){
     eepromSettings.homingTravelAfterLimitY = 20;
     eepromSettings.homingTravelAfterLimitZ = 20;
 
-    eepromSettings.directionX = 1;
+    eepromSettings.directionX = 0;
     eepromSettings.directionY = 0;
     eepromSettings.directionZ = 0;
 

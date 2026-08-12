@@ -13,7 +13,7 @@
 // =========================================================
 // [FUNGSI OTAK CAM: PUSAT BATERAI (ZIG-ZAG)]
 // =========================================================
-Koordinat_t CalculateBatteryCenter_mm(void);
+Koordinat_t Calculate_Battery_Center_mm(void);
 
 /**
  * Mengonversi jarak milimeter (Sumbu X) menjadi jumlah pulsa motor
@@ -38,5 +38,11 @@ long Convert_mm_to_PulseZ(float target_mm);
 
 void Update_Motor_Param_From_Settings(void);
 void Update_Motor_Param_Homing_From_Settings(void);
+
+// ---------------------------------------------------------
+// HELPER 2: Jeda Waktu (Delay) Aman dari Watchdog & E-Stop
+// Memecah delay panjang menjadi kepingan 10ms
+// ---------------------------------------------------------
+bool Delay_With_Watchdog(uint32_t total_delay_ms);
 
 #endif /* SRC_UTILITASDANPERHITUNGAN_H_ */
