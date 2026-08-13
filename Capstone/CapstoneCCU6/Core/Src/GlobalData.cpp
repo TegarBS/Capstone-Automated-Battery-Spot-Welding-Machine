@@ -7,6 +7,8 @@
 
 #include "GlobalData.h"
 
+volatile uint16_t errorCallback = 0;
+
 // =========================================================
 // [STRUCT PARAMETER PERMANEN (EEPROM)]
 // =========================================================

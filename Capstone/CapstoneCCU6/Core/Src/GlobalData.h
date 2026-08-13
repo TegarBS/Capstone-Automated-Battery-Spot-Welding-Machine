@@ -23,6 +23,9 @@
 
 #define SKALA_FLOAT 100.0f
 
+
+extern volatile uint16_t errorCallback;
+
 // =========================================================
 // [STRUCT PARAMETER PERMANEN (EEPROM)]
 // =========================================================

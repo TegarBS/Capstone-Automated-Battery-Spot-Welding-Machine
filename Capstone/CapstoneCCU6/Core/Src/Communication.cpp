@@ -139,6 +139,7 @@ extern "C" void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
             portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
         }
 
+
         // Pancing interupsi berikutnya
         HAL_UART_Receive_IT(&huart1, &rxChar, 1);
     }
@@ -150,6 +151,9 @@ extern "C" void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 extern "C" void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
     if (huart->Instance == USART1) { // Sesuaikan dengan USART yang Anda pakai
 
+    	rxIndex = 0;
+
+    	HAL_UART_AbortReceive(huart);
         // 1. Bersihkan bendera error secara manual (Opsional tapi disarankan)
         __HAL_UART_CLEAR_OREFLAG(huart);
         __HAL_UART_CLEAR_FEFLAG(huart);
@@ -158,6 +162,9 @@ extern "C" void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
 
         // 2. PAKSA STM32 UNTUK MENDENGARKAN KEMBALI!
         // Tanpa baris ini, STM32 akan "tuli" selamanya setelah terkena noise.
+
+        errorCallback++;
+
         HAL_UART_Receive_IT(&huart1, &rxChar, 1);
     }
 }
