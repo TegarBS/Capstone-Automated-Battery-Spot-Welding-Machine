@@ -120,9 +120,9 @@ extern volatile bool isNavigating;
 extern volatile bool isPaused;
 extern volatile bool isAborted;
 extern volatile bool ignoreLimitSwitch;
-extern volatile bool flagMintaHoming;
+extern volatile bool isPerformHoming;
 extern volatile bool isAutoWeldActive;
-extern volatile bool flagManualJog;
+extern volatile bool isPerformManualJog;
 extern volatile bool isMachineHomed;
 extern volatile bool isFirstWeldCycle;
 

@@ -12,6 +12,8 @@
 #include "GlobalData.h"
 #include "UtilitasDanPerhitungan.h"
 
+uint16_t tesreset = 0;
+
 // --- Konstanta Modbus ---
 const uint16_t MODBUS_COIL_ON = 0xFF00;
 const uint8_t  MODBUS_EXCEPTION_ILLEGAL_ADDRESS    = 0x02;
@@ -27,10 +29,10 @@ enum ModbusCoilAddress {
     COIL_PAUSE_RESUME    = 0x0003,
     COIL_MANUAL_JOG      = 0x0004,
 
-    COIL_SAVE_TO_FLASH   = 0x00010,
-    COIL_RESET_SYSTEM    = 0x00011,
-	COIL_CMD_ZERO_Z      = 0x00012,
-	COIL_CMD_UNLOCK_Z    = 0x00013,
+    COIL_SAVE_TO_FLASH   = 0x0000A,
+    COIL_RESET_SYSTEM    = 0x0000B,
+	COIL_CMD_ZERO_Z      = 0x0000C,
+	COIL_CMD_UNLOCK_Z    = 0x0000D,
 
 	MAX_COILS_READABLE   = 10
 };
@@ -52,16 +54,16 @@ enum ModbusDiscreteInput {
 	DI_IS_MACHINE_HOMED = 0x0003,
 	DI_IS_MACHINE_RUN   = 0x0004,
 
-    MAX_DISCRETE_INPUTS = 10
 };
 
 // =========================================================
 // TASK KOMUNIKASI (PARSER MODBUS RTU ZERO-QUEUE)
 // =========================================================
 void Task_Komunikasi(void *pvParameters) {
-    // Definisi konstanta ID Slave agar tidak menggunakan magic number (0x01)
+
 	Delay_With_Watchdog(500, heartbeat_Komunikasi);
     HAL_UART_Receive_IT(&huart1, &rxChar, 1);
+
     const uint8_t SLAVE_ID = 0x01;
 
     while(1) {
@@ -236,13 +238,13 @@ bool Baca_Status_Coil(uint16_t coil_addr) {
             return isAborted;          // Variabel E-Stop
 
         case COIL_REQUEST_HOMING:
-            return flagMintaHoming;
+            return isPerformHoming;
 
         case COIL_PAUSE_RESUME:
             return isPaused;
 
         case COIL_MANUAL_JOG:
-            return flagManualJog;
+            return isPerformManualJog;
 
         default:
             return false; // Alamat tidak valid
@@ -258,7 +260,7 @@ void Function_Code_02_READ_DISCRETE_INPUT(uint8_t* rxBufferInput, uint8_t len) {
     uint16_t quantity   = (rxBufferInput[4] << 8) | rxBufferInput[5];
 
     // 2. Validasi Batas Alamat
-    if ((start_addr + quantity) <= MAX_DISCRETE_INPUTS) {
+    if ((start_addr + quantity) <= TOTAL_DISCRETE_INPUT) {
 
         uint8_t txBuffer[256];
 
@@ -418,6 +420,8 @@ void Function_Code_05_WRITE_SINGLE_COIL(uint8_t* rxBufferInput, uint8_t len) {
         case COIL_START_AUTO_WELD:
             if (coil_val == MODBUS_COIL_ON) {
 
+            	//if ()
+
                 // --- 1. PRE-FLIGHT CHECK (SABUK PENGAMAN) ---
                 if (configLas.totalKolom == 0 || configLas.totalBaris == 0 ||
                     configLas.pitchX == 0.0f  || configLas.pitchY == 0.0f) {
@@ -431,9 +435,6 @@ void Function_Code_05_WRITE_SINGLE_COIL(uint8_t* rxBufferInput, uint8_t len) {
                 isAutoWeldActive = true;
                 isFirstWeldCycle = true;
 
-            } else {
-                // Opsional: Jika HMI mengirim nilai OFF (0x0000) untuk mematikan mode Auto
-                isAutoWeldActive = false;
             }
             break;
 
@@ -446,7 +447,7 @@ void Function_Code_05_WRITE_SINGLE_COIL(uint8_t* rxBufferInput, uint8_t len) {
 
         case COIL_REQUEST_HOMING:
             if (coil_val == MODBUS_COIL_ON) {
-                flagMintaHoming = true;
+                isPerformHoming = true;
             }
             break;
 
@@ -456,7 +457,7 @@ void Function_Code_05_WRITE_SINGLE_COIL(uint8_t* rxBufferInput, uint8_t len) {
 
         case COIL_MANUAL_JOG:
             if (coil_val == MODBUS_COIL_ON) {
-                flagManualJog = true;
+                isPerformManualJog = true;
             }
             break;
 
@@ -616,6 +617,8 @@ uint16_t Hitung_CRC16(const uint8_t *nData, uint16_t wLength) {
 void Process_System_Reset(uint8_t* rxBufferInput, uint16_t len) {
     // 1. Echo ke HMI agar tidak Timeout
     HAL_UART_Transmit(&huart1, rxBufferInput, len, 100);
+
+    tesreset++;
 
     // 2. Tunggu transmisi UART selesai
     vTaskDelay(pdMS_TO_TICKS(50));

@@ -46,9 +46,9 @@ volatile bool isNavigating = false;
 volatile bool isPaused = false;
 volatile bool isAborted = false;
 volatile bool ignoreLimitSwitch = false;
-volatile bool flagMintaHoming = false;
+volatile bool isPerformHoming = false;
 volatile bool isAutoWeldActive = false;
-volatile bool flagManualJog = false;
+volatile bool isPerformManualJog = false;
 volatile bool isMachineHomed = false;
 volatile bool isFirstWeldCycle = false;
 

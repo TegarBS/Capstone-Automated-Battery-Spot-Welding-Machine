@@ -36,12 +36,12 @@ bool Save_Settings_To_Flash(void) {
     // 1. SAFETY INTERLOCK (PENCEGAHAN CRASH)
     // Jangan izinkan penyimpanan jika mesin sedang melakukan aktivitas kritis!
     // ==========================================================
-    if (isAutoWeldActive || flagManualJog || flagMintaHoming || isNavigating) {
+    if (isAutoWeldActive || isPerformManualJog || isPerformHoming || isNavigating) {
         return false; // TOLAK PERINTAH! Mesin sedang sibuk
     }
 
     if (motorX && motorY) {
-        if (motorX->isMoving() || motorY->isMoving()) {
+        if (motorX->isMoving() || motorY->isMoving() || motorZ->isMoving()) {
             return false; // TOLAK PERINTAH! Motor sedang berputar
         }
     }

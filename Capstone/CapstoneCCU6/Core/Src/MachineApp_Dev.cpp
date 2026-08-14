@@ -84,13 +84,13 @@ void Task_Sequencer(void *pvParameters) {
         if (isAborted) {
             Handle_Emergency_Abort();
         }
-        else if (flagMintaHoming) {
+        else if (isPerformHoming) {
             Perform_Homing_Sequence();
         }
         else if (isAutoWeldActive) {
             Perform_Auto_Weld_Cycle();
         }
-        else if (flagManualJog) {
+        else if (isPerformManualJog) {
             Perform_Manual_Jog();
         }
         else {
@@ -120,7 +120,12 @@ bool Wait_Motors_Reach_Target(bool includeZ = false) {
 }
 
 void Handle_Emergency_Abort(void) {
+	isNavigating = false;
+
     isAutoWeldActive = false;
+	isPerformHoming = false;
+	isPerformManualJog = false;
+
     isAborted = false;
     isMachineHomed = false;
 
@@ -146,11 +151,7 @@ void Perform_Homing_Sequence(void) {
     if (HAL_GPIO_ReadPin(LIMIT_Y_GPIO_Port, LIMIT_Y_Pin) == LIMIT_Y_Pressed) motorY->stop();
     else motorY->setTargetPulse(-999999);
 
-    if (!Wait_Motors_Reach_Target()) {
-		isNavigating = false;
-		flagMintaHoming = false; // Batalkan niat homing
-		return; // Keluar dari fungsi ini SEKARANG JUGA!
-	} // Gagal / Batal
+    if (!Wait_Motors_Reach_Target()) return;
 
     motorX->resetPosition();
     motorY->resetPosition();
@@ -162,7 +163,7 @@ void Perform_Homing_Sequence(void) {
 
     if (!Wait_Motors_Reach_Target()) {
 		isNavigating = false;
-		flagMintaHoming = false; // Batalkan niat homing
+		isPerformHoming = false; // Batalkan niat homing
 		return; // Keluar dari fungsi ini SEKARANG JUGA!
 	}
 
@@ -174,7 +175,7 @@ void Perform_Homing_Sequence(void) {
     Update_Motor_Param_From_Settings();
 
     isMachineHomed = true;
-    flagMintaHoming = false;
+    isPerformHoming = false;
 }
 
 void Perform_Auto_Weld_Cycle(void) {
@@ -191,7 +192,7 @@ void Perform_Auto_Weld_Cycle(void) {
 	}
 
     if (!isMachineHomed) {
-        flagMintaHoming = true; return;
+        isPerformHoming = true; return;
     }
 
     if (indexBarisAktual >= configLas.totalBaris) {
@@ -280,7 +281,7 @@ void Perform_Manual_Jog(void) {
     Wait_Motors_Reach_Target(true); // Termasuk motor Z
 
     isNavigating = false;
-    flagManualJog = false;
+    isPerformManualJog = false;
 
     // Reset Register
     for(int i = 6; i <= 11; i++) Holding_Registers[i] = 0;
