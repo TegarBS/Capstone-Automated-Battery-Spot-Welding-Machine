@@ -84,9 +84,9 @@ void Update_Motor_Param_From_Settings(void) {
     float calc_minX_Hz   = (float)eepromSettings.minSpeedX * eepromSettings.stepsPerMmX / 60.0f;
     float calc_accelX_Hz = (float)eepromSettings.accelX * eepromSettings.stepsPerMmX;
 
-    motorX->setMaxSpeedHz(calc_maxX_Hz);
-    motorX->setMinSpeedHz(calc_minX_Hz);
-    motorX->setAccelHz(calc_accelX_Hz);
+    motorX.setMaxSpeedHz(calc_maxX_Hz);
+    motorX.setMinSpeedHz(calc_minX_Hz);
+    motorX.setAccelHz(calc_accelX_Hz);
 
     // ---------------------------------------------------------
     // 2. UPDATE PROFIL MOTOR Y (Kalkulasi Hz independen)
@@ -95,9 +95,9 @@ void Update_Motor_Param_From_Settings(void) {
     float calc_minY_Hz   = (float)eepromSettings.minSpeedY * eepromSettings.stepsPerMmY / 60.0f;
     float calc_accelY_Hz = (float)eepromSettings.accelY * eepromSettings.stepsPerMmY;
 
-    motorY->setMaxSpeedHz(calc_maxY_Hz);
-    motorY->setMinSpeedHz(calc_minY_Hz);
-    motorY->setAccelHz(calc_accelY_Hz);
+    motorY.setMaxSpeedHz(calc_maxY_Hz);
+    motorY.setMinSpeedHz(calc_minY_Hz);
+    motorY.setAccelHz(calc_accelY_Hz);
 
     // ---------------------------------------------------------
     // 3. UPDATE PROFIL MOTOR Z (Kalkulasi Hz independen)
@@ -106,22 +106,22 @@ void Update_Motor_Param_From_Settings(void) {
     float calc_minZ_Hz   = (float)eepromSettings.minSpeedZ * eepromSettings.stepsPerMmZ / 60.0f;
     float calc_accelZ_Hz = (float)eepromSettings.accelZ * eepromSettings.stepsPerMmZ;
 
-    motorZ->setMaxSpeedHz(calc_maxZ_Hz);
-    motorZ->setMinSpeedHz(calc_minZ_Hz);
-    motorZ->setAccelHz(calc_accelZ_Hz);
+    motorZ.setMaxSpeedHz(calc_maxZ_Hz);
+    motorZ.setMinSpeedHz(calc_minZ_Hz);
+    motorZ.setAccelHz(calc_accelZ_Hz);
 
-    motorX->setInvertDirection(eepromSettings.directionX != 0);
-	motorY->setInvertDirection(eepromSettings.directionY != 0);
-	motorZ->setInvertDirection(eepromSettings.directionZ != 0);
+    motorX.setInvertDirection(eepromSettings.directionX != 0);
+	motorY.setInvertDirection(eepromSettings.directionY != 0);
+	motorZ.setInvertDirection(eepromSettings.directionZ != 0);
 
 	// Konversi milimeter ke Pulse, lalu suntikkan ke Motor
 	long batasPulseX = Convert_mm_to_PulseX(eepromSettings.maxTravelX);
 	long batasPulseY = Convert_mm_to_PulseY(eepromSettings.maxTravelY);
 	long batasPulseZ = Convert_mm_to_PulseZ(eepromSettings.maxTravelZ);
 
-	motorX->setMaxPositionLimitPulse(batasPulseX);
-	motorY->setMaxPositionLimitPulse(batasPulseY);
-	motorZ->setMaxPositionLimitPulse(batasPulseZ);
+	motorX.setMaxPositionLimitPulse(batasPulseX);
+	motorY.setMaxPositionLimitPulse(batasPulseY);
+	motorZ.setMaxPositionLimitPulse(batasPulseZ);
 }
 
 //Motor Z Tidak Homing
@@ -133,9 +133,9 @@ void Update_Motor_Param_Homing_From_Settings(void) {
     float calc_minX_Hz   = (float)eepromSettings.minSpeedX * eepromSettings.stepsPerMmX / 60.0f;
     float calc_accelX_Hz = (float)eepromSettings.accelX * eepromSettings.stepsPerMmX;
 
-    motorX->setMaxSpeedHz(calc_maxX_Hz);
-    motorX->setMinSpeedHz(calc_minX_Hz);
-    motorX->setAccelHz(calc_accelX_Hz);
+    motorX.setMaxSpeedHz(calc_maxX_Hz);
+    motorX.setMinSpeedHz(calc_minX_Hz);
+    motorX.setAccelHz(calc_accelX_Hz);
 
     // ---------------------------------------------------------
     // 2. UPDATE PROFIL MOTOR Y (Kalkulasi Hz independen)
@@ -144,12 +144,12 @@ void Update_Motor_Param_Homing_From_Settings(void) {
     float calc_minY_Hz   = (float)eepromSettings.minSpeedY * eepromSettings.stepsPerMmY / 60.0f;
     float calc_accelY_Hz = (float)eepromSettings.accelY * eepromSettings.stepsPerMmY;
 
-    motorY->setMaxSpeedHz(calc_maxY_Hz);
-    motorY->setMinSpeedHz(calc_minY_Hz);
-    motorY->setAccelHz(calc_accelY_Hz);
+    motorY.setMaxSpeedHz(calc_maxY_Hz);
+    motorY.setMinSpeedHz(calc_minY_Hz);
+    motorY.setAccelHz(calc_accelY_Hz);
 
-    motorX->setInvertDirection(eepromSettings.directionX != 0);
-	motorY->setInvertDirection(eepromSettings.directionY != 0);
+    motorX.setInvertDirection(eepromSettings.directionX != 0);
+	motorY.setInvertDirection(eepromSettings.directionY != 0);
 }
 
 // ---------------------------------------------------------

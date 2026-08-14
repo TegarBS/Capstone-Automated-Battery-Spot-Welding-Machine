@@ -40,31 +40,29 @@ void Task_Monitor(void *pvParameters) {
 		}
 
         // --- 1. UPDATE REGISTER MODBUS (MONITORING POSISI) ---
-        if (motorX && motorY && motorZ) {
-            long currentX_pulse = motorX->getCurrentPositionPulse();
-            long currentY_pulse = motorY->getCurrentPositionPulse();
-            long currentZ_pulse = motorZ->getCurrentPositionPulse();
+		long currentX_pulse = motorX.getCurrentPositionPulse();
+		long currentY_pulse = motorY.getCurrentPositionPulse();
+		long currentZ_pulse = motorZ.getCurrentPositionPulse();
 
-            // KONVERSI KE MILIMETER DENGAN PRESISI x100
-            // Rumus: (Pulse * 100) / Steps_per_mm
-            long currentX_mm = (currentX_pulse * 100) / eepromSettings.stepsPerMmX;
-            long currentY_mm = (currentY_pulse * 100) / eepromSettings.stepsPerMmY;
-            long currentZ_mm = (currentZ_pulse * 100) / eepromSettings.stepsPerMmZ;
+		// KONVERSI KE MILIMETER DENGAN PRESISI x100
+		// Rumus: (Pulse * 100) / Steps_per_mm
+		long currentX_mm = (currentX_pulse * 100) / eepromSettings.stepsPerMmX;
+		long currentY_mm = (currentY_pulse * 100) / eepromSettings.stepsPerMmY;
+		long currentZ_mm = (currentZ_pulse * 100) / eepromSettings.stepsPerMmZ;
 
-            // Pecah 32-bit (long) menjadi 2 bagian 16-bit untuk Input Register Modbus
-            Input_Registers[0] = currentX_mm & 0xFFFF;
-            Input_Registers[1] = (currentX_mm >> 16) & 0xFFFF;
-            Input_Registers[2] = currentY_mm & 0xFFFF;
-            Input_Registers[3] = (currentY_mm >> 16) & 0xFFFF;
-            Input_Registers[4] = currentZ_mm & 0xFFFF;
-            Input_Registers[5] = (currentZ_mm >> 16) & 0xFFFF;
+		// Pecah 32-bit (long) menjadi 2 bagian 16-bit untuk Input Register Modbus
+		Input_Registers[0] = currentX_mm & 0xFFFF;
+		Input_Registers[1] = (currentX_mm >> 16) & 0xFFFF;
+		Input_Registers[2] = currentY_mm & 0xFFFF;
+		Input_Registers[3] = (currentY_mm >> 16) & 0xFFFF;
+		Input_Registers[4] = currentZ_mm & 0xFFFF;
+		Input_Registers[5] = (currentZ_mm >> 16) & 0xFFFF;
 
-            Input_Registers[7] = indexKolomAktual + 1;
-            Input_Registers[8] = indexBarisAktual + 1;
+		Input_Registers[7] = indexKolomAktual + 1;
+		Input_Registers[8] = indexBarisAktual + 1;
 
-            // Alert ke HMI
-            Holding_Registers[12] = kode_alarm_sistem;
-        }
+		// Alert ke HMI
+		Holding_Registers[12] = kode_alarm_sistem;
 
 
 

@@ -479,14 +479,14 @@ void Function_Code_05_WRITE_SINGLE_COIL(uint8_t* rxBufferInput, uint8_t len) {
 
         case COIL_CMD_ZERO_Z:
             if (coil_val == MODBUS_COIL_ON) {
-                motorZ->setAsHome();
+                motorZ.setAsHome();
             }
             break;
 
         case COIL_CMD_UNLOCK_Z:
             // Cabut sabuk pengaman motor Z
             if (coil_val == MODBUS_COIL_ON) {
-                motorZ->unlockPosition();
+                motorZ.unlockPosition();
             }
             break;
 

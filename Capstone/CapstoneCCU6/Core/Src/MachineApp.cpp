@@ -49,7 +49,7 @@ void MachineApp_Init(void) {
     motorY = new StepperMotor(STEP_Y_GPIO_Port, STEP_Y_Pin, DIR_Y_GPIO_Port, DIR_Y_Pin, &htim3);
 
     //Motor X terbalik
-    motorX->setInvertDirection(true);
+    motorX.setInvertDirection(true);
 
     // Buat Semaphore & Queue
     SinyalPosisiTercapai = xSemaphoreCreateBinary();
@@ -99,15 +99,15 @@ void Task_Sequencer(void *pvParameters) {
 
 				// --- TAHAP 1: SEEK (Cari Limit Switch) ---
 				isNavigating = true;
-				motorX->setTarget(-999999);
-				motorY->setTarget(-999999);
+				motorX.setTarget(-999999);
+				motorY.setTarget(-999999);
 
 				// Tunggu sampai motor menabrak limit switch & berhenti oleh EXTI
 				xSemaphoreTake(SinyalPosisiTercapai, portMAX_DELAY);
 
 				// Reset koordinat sementara agar kita bisa memberikan perintah maju
-				motorX->resetPosition();
-				motorY->resetPosition();
+				motorX.resetPosition();
+				motorY.resetPosition();
 
 
 				// --- TAHAP 2: PULL-OFF (Mundur untuk Melepas Sakelar) ---
@@ -117,8 +117,8 @@ void Task_Sequencer(void *pvParameters) {
 				isNavigating = true;
 				// Mundur sejauh 200 step (Arah Positif)
 				// Catatan: Jika 200 step belum cukup untuk melepas bunyi 'klik' limit switch, naikkan angkanya (misal 500)
-				motorX->setTarget(3200);
-				motorY->setTarget(3200);
+				motorX.setTarget(3200);
+				motorY.setTarget(3200);
 
 				// Tunggu sampai motor selesai mundur
 				xSemaphoreTake(SinyalPosisiTercapai, portMAX_DELAY);
@@ -129,16 +129,16 @@ void Task_Sequencer(void *pvParameters) {
 
 				// --- TAHAP 3: TETAPKAN ZERO ABSOLUT ---
 				// Titik setelah mundur ini adalah titik (0,0) yang asli dan aman!
-				motorX->resetPosition();
-				motorY->resetPosition();
+				motorX.resetPosition();
+				motorY.resetPosition();
 
 				continue; // Selesai Homing, lanjut ke siklus antrean berikutnya
 			}
 
             // 1. SET TARGET MOTOR (Bergerak ke Titik Las)
             isNavigating = true;
-            motorX->setTarget(target.x);
-            motorY->setTarget(target.y);
+            motorX.setTarget(target.x);
+            motorY.setTarget(target.y);
 
             // 2. TUNGGU MOTOR SAMPAI DI TUJUAN
             xSemaphoreTake(SinyalPosisiTercapai, portMAX_DELAY);
@@ -186,24 +186,24 @@ extern "C" void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 
     // 1. TANGANI KONDISI DARURAT (ABORT)
     if (isAborted) {
-        if (motorX) motorX->stop(); // Fungsi stop() otomatis mematikan Hardware Timer
-        if (motorY) motorY->stop();
+        if (motorX) motorX.stop(); // Fungsi stop() otomatis mematikan Hardware Timer
+        if (motorY) motorY.stop();
         // Catatan: Semaphore akan otomatis dilepas di blok evaluasi di bawah
     }
 
     // 2. EKSEKUSI PULSA MOTOR X (Hanya jika tidak di-Pause)
     if (htim->Instance == TIM2) {
-        if (motorX && !isPaused) motorX->isr_update();
+        if (motorX && !isPaused) motorX.isr_update();
     }
 
     // 3. EKSEKUSI PULSA MOTOR Y (Hanya jika tidak di-Pause)
     if (htim->Instance == TIM3) {
-        if (motorY && !isPaused) motorY->isr_update();
+        if (motorY && !isPaused) motorY.isr_update();
     }
 
     // 4. SINKRONISASI KE RTOS (Evaluasi Target atau Abort)
     // Jika sedang navigasi dan kedua motor telah berhenti (entah karena sampai atau di-Abort)
-    if (isNavigating && !motorX->isMoving && !motorY->isMoving) {
+    if (isNavigating && !motorX.isMoving && !motorY.isMoving) {
         isNavigating = false;
 
         // Bangunkan Task_Sequencer
@@ -218,7 +218,7 @@ extern "C" void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 
     // (Opsional) Deteksi Emergency Stop (Tidak boleh mengabaikan limit switch)
     // if (GPIO_Pin == ESTOP_Pin) {
-    //     motorX->stop(); motorY->stop();
+    //     motorX.stop(); motorY.stop();
     //     // Matikan relay las / pneumatik
     // }
 
@@ -227,12 +227,12 @@ extern "C" void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 
     // 1. Deteksi Limit Switch Sumbu X
     if (GPIO_Pin == LIMIT_X_Pin) {
-        if (motorX) motorX->stop();
+        if (motorX) motorX.stop();
     }
 
     // 2. Deteksi Limit Switch Sumbu Y
     if (GPIO_Pin == LIMIT_Y_Pin) {
-        if (motorY) motorY->stop();
+        if (motorY) motorY.stop();
     }
 
 
@@ -244,8 +244,8 @@ void Task_Monitor(void *pvParameters) {
     while(1) {
         // --- 1. UPDATE REGISTER MODBUS ---
         if (motorX && motorY) {
-            long currentX = motorX->getCurrentPosition();
-            long currentY = motorY->getCurrentPosition();
+            long currentX = motorX.getCurrentPosition();
+            long currentY = motorY.getCurrentPosition();
 
             // Pecah 32-bit (long) menjadi 2 bagian 16-bit (Register)
             Input_Registers[0] = currentX & 0xFFFF;

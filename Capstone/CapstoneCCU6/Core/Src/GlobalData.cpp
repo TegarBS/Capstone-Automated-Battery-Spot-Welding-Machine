@@ -35,9 +35,6 @@ uint16_t kode_alarm_sistem = 0;
 // =========================================================
 // 2 [OBJEK & PERIPHERAL]
 // =========================================================
-StepperMotor* motorX = NULL;
-StepperMotor* motorY = NULL;
-StepperMotor* motorZ = NULL;
 
 // =========================================================
 // 3 [BENDERA KONTROL MESIN (STATE MACHINE)]

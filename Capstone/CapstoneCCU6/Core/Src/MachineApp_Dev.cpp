@@ -33,6 +33,10 @@ void Perform_Manual_Jog(void);
 #define WELD_PIN GPIO_PIN_11
 #endif
 
+StepperMotor motorX(STEP_X_GPIO_Port, STEP_X_Pin, DIR_X_GPIO_Port, DIR_X_Pin, &htim2);
+StepperMotor motorY(STEP_Y_GPIO_Port, STEP_Y_Pin, DIR_Y_GPIO_Port, DIR_Y_Pin, &htim3);
+StepperMotor motorZ(STEP_Z_GPIO_Port, STEP_Z_Pin, DIR_Z_GPIO_Port, DIR_Z_Pin, &htim4);
+
 // --- FUNGSI INISIALISASI MESIN ---
 void MachineApp_Init(void) {
 	// -----------------------------------------------------
@@ -57,10 +61,6 @@ void MachineApp_Init(void) {
 
 	Load_Settings_From_Flash();
 
-    motorX = new StepperMotor(STEP_X_GPIO_Port, STEP_X_Pin, DIR_X_GPIO_Port, DIR_X_Pin, &htim2);
-    motorY = new StepperMotor(STEP_Y_GPIO_Port, STEP_Y_Pin, DIR_Y_GPIO_Port, DIR_Y_Pin, &htim3);
-    motorZ = new StepperMotor(STEP_Z_GPIO_Port, STEP_Z_Pin, DIR_Z_GPIO_Port, DIR_Z_Pin, &htim4);
-
     // Buat Semaphore & Queue
     SinyalPosisiTercapai = xSemaphoreCreateBinary();
     Sem_DataDiterima = xSemaphoreCreateBinary();
@@ -71,8 +71,6 @@ void MachineApp_Init(void) {
     xTaskCreate(Task_Monitor, "Task_Mon", 256, NULL, 1, NULL);
 
     Update_Motor_Param_From_Settings();
-
-
 }
 
 void MachineApp_Loop(void) {}
@@ -110,7 +108,7 @@ void Task_Sequencer(void *pvParameters) {
 // Return TRUE jika sukses sampai tujuan, FALSE jika dibatalkan (E-Stop)
 // ---------------------------------------------------------
 bool Wait_Motors_Reach_Target(bool includeZ = false) {
-    while (motorX->isMoving() || motorY->isMoving() || (includeZ && motorZ->isMoving())) {
+    while (motorX.isMoving() || motorY.isMoving() || (includeZ && motorZ.isMoving())) {
         xSemaphoreTake(SinyalPosisiTercapai, pdMS_TO_TICKS(20));
         heartbeat_Sequencer = true; // LAPOR MANDOR IWDG!
 
@@ -132,9 +130,9 @@ void Handle_Emergency_Abort(void) {
     HAL_GPIO_WritePin(RELAY_Z_PORT, RELAY_Z_PIN, GPIO_PIN_RESET);
     HAL_GPIO_WritePin(WELD_PORT, WELD_PIN, GPIO_PIN_RESET);
 
-    motorX->stop();
-    motorY->stop();
-    motorZ->stop();
+    motorX.stop();
+    motorY.stop();
+    motorZ.stop();
 }
 
 void Perform_Homing_Sequence(void) {
@@ -142,24 +140,24 @@ void Perform_Homing_Sequence(void) {
 
     // --- TAHAP 1: SEEK ---
     isNavigating = true;
-    motorX->isHomed = false;
-    motorY->isHomed = false;
+    motorX.isHomed = false;
+    motorY.isHomed = false;
 
-    if (HAL_GPIO_ReadPin(LIMIT_X_GPIO_Port, LIMIT_X_Pin) == LIMIT_X_Pressed) motorX->stop();
-    else motorX->setTargetPulse(-999999);
+    if (HAL_GPIO_ReadPin(LIMIT_X_GPIO_Port, LIMIT_X_Pin) == LIMIT_X_Pressed) motorX.stop();
+    else motorX.setTargetPulse(-999999);
 
-    if (HAL_GPIO_ReadPin(LIMIT_Y_GPIO_Port, LIMIT_Y_Pin) == LIMIT_Y_Pressed) motorY->stop();
-    else motorY->setTargetPulse(-999999);
+    if (HAL_GPIO_ReadPin(LIMIT_Y_GPIO_Port, LIMIT_Y_Pin) == LIMIT_Y_Pressed) motorY.stop();
+    else motorY.setTargetPulse(-999999);
 
     if (!Wait_Motors_Reach_Target()) return;
 
-    motorX->resetPosition();
-    motorY->resetPosition();
+    motorX.resetPosition();
+    motorY.resetPosition();
 
     // --- TAHAP 2: PULL-OFF ---
     ignoreLimitSwitch = true;
-    motorX->setTargetPulse(Convert_mm_to_PulseX(eepromSettings.homingTravelAfterLimitX));
-    motorY->setTargetPulse(Convert_mm_to_PulseY(eepromSettings.homingTravelAfterLimitY));
+    motorX.setTargetPulse(Convert_mm_to_PulseX(eepromSettings.homingTravelAfterLimitX));
+    motorY.setTargetPulse(Convert_mm_to_PulseY(eepromSettings.homingTravelAfterLimitY));
 
     if (!Wait_Motors_Reach_Target()) {
 		isNavigating = false;
@@ -170,8 +168,8 @@ void Perform_Homing_Sequence(void) {
     ignoreLimitSwitch = false;
 
     // --- TAHAP 3: ZERO ABSOLUT ---
-    motorX->resetPosition();
-    motorY->resetPosition();
+    motorX.resetPosition();
+    motorY.resetPosition();
     Update_Motor_Param_From_Settings();
 
     isMachineHomed = true;
@@ -216,8 +214,8 @@ void Perform_Auto_Weld_Cycle(void) {
         }
 
         isNavigating = true;
-        motorX->setTargetPulse(Convert_mm_to_PulseX(center.x));
-        motorY->setTargetPulse(Convert_mm_to_PulseY(center.y + offsetY_mm));
+        motorX.setTargetPulse(Convert_mm_to_PulseX(center.x));
+        motorY.setTargetPulse(Convert_mm_to_PulseY(center.y + offsetY_mm));
 
         if (!Wait_Motors_Reach_Target()) return; // Gagal / Batal
         isNavigating = false;
@@ -269,14 +267,14 @@ void Perform_Manual_Jog(void) {
     long jogManY_mm = (long)( ((uint32_t)Holding_Registers[9] << 16) | (uint32_t)Holding_Registers[8] );
     long jogManZ_mm = (long)( ((uint32_t)Holding_Registers[11] << 16) | (uint32_t)Holding_Registers[10] );
 
-    long targetAbsX = motorX->getCurrentPositionPulse() + Convert_mm_to_PulseX(jogManX_mm);
-    long targetAbsY = motorY->getCurrentPositionPulse() + Convert_mm_to_PulseY(jogManY_mm);
-    long targetAbsZ = motorZ->getCurrentPositionPulse() + Convert_mm_to_PulseZ(jogManZ_mm);
+    long targetAbsX = motorX.getCurrentPositionPulse() + Convert_mm_to_PulseX(jogManX_mm);
+    long targetAbsY = motorY.getCurrentPositionPulse() + Convert_mm_to_PulseY(jogManY_mm);
+    long targetAbsZ = motorZ.getCurrentPositionPulse() + Convert_mm_to_PulseZ(jogManZ_mm);
 
     isNavigating = true;
-    motorX->setTargetPulse(targetAbsX);
-    motorY->setTargetPulse(targetAbsY);
-    motorZ->setTargetPulse(targetAbsZ);
+    motorX.setTargetPulse(targetAbsX);
+    motorY.setTargetPulse(targetAbsY);
+    motorZ.setTargetPulse(targetAbsZ);
 
     Wait_Motors_Reach_Target(true); // Termasuk motor Z
 

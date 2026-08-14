@@ -40,11 +40,10 @@ bool Save_Settings_To_Flash(void) {
         return false; // TOLAK PERINTAH! Mesin sedang sibuk
     }
 
-    if (motorX && motorY) {
-        if (motorX->isMoving() || motorY->isMoving() || motorZ->isMoving()) {
-            return false; // TOLAK PERINTAH! Motor sedang berputar
-        }
-    }
+
+	if (motorX.isMoving() || motorY.isMoving() || motorZ.isMoving()) {
+		return false; // TOLAK PERINTAH! Motor sedang berputar
+	}
 
     // 2. Ambil data terbaru dari Holding Registers HMI
     Ambil_Data_Dari_Holding_Register();

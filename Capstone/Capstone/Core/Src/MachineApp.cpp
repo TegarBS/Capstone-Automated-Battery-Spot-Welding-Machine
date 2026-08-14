@@ -48,8 +48,8 @@ void MachineApp_Init(void) {
 
 
     // [UJI COBA]: Memberikan target fiktif agar motor langsung bergerak saat mesin menyala
-    motorX->setTargetPulse(6400); // Bergerak maju 6400 step (1 putaran penuh dengan 1/32 microstepping)
-    motorY->setTargetPulse(-3200); // Bergerak mundur setengah putaran
+    motorX.setTargetPulse(6400); // Bergerak maju 6400 step (1 putaran penuh dengan 1/32 microstepping)
+    motorY.setTargetPulse(-3200); // Bergerak mundur setengah putaran
 
     // [TAMBAHAN UNTUK LANGKAH 5: Pemicu awal FSM]
     // Kita paksa mesin langsung masuk ke mode gerak saat dinyalakan (untuk uji coba)
@@ -75,7 +75,7 @@ void MachineApp_Loop(void) {
 
         case STATE_MOVE_XY:
             // Cek apakah kedua motor sudah sampai di tujuan (isMoving == false)
-            if (!motorX->isMoving(void) && !motorY->isMoving(void)) {
+            if (!motorX.isMoving(void) && !motorY.isMoving(void)) {
                 // Motor sampai! Pindah ke fase berikutnya: Turunkan Pneumatik Z
                 currentState = STATE_DROP_Z;
 
@@ -136,8 +136,8 @@ extern "C" void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 
         // Panggil fungsi update() untuk memicu langkah (STEP)
         // Pengecekan pointer (motor != nullptr) mencegah crash jika timer menyala sebelum motor diinisialisasi
-        if (motorX) motorX->update();
-        if (motorY) motorY->update();
+        if (motorX) motorX.update();
+        if (motorY) motorY.update();
 
     }
 }

@@ -109,9 +109,9 @@ extern uint16_t kode_alarm_sistem;
 // =========================================================
 // 2 [OBJEK & PERIPHERAL]
 // =========================================================
-extern StepperMotor* motorX;
-extern StepperMotor* motorY;
-extern StepperMotor* motorZ;
+extern StepperMotor motorX;
+extern StepperMotor motorY;
+extern StepperMotor motorZ;
 
 // =========================================================
 // 3 [BENDERA KONTROL MESIN (STATE MACHINE)]
