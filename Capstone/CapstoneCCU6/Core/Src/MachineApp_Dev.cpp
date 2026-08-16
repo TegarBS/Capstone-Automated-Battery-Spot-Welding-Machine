@@ -136,8 +136,49 @@ void Handle_Emergency_Abort(void) {
     motorZ.stop();
 }
 
+bool Homing_Silinder_Z(void) {
+    uint32_t startTime;
+
+    // 1. Perintahkan Silinder Naik
+    Silinder_Up();
+    startTime = HAL_GetTick();
+
+    // 2. Tunggu sampai sensor atas menyala
+    while (HAL_GPIO_ReadPin(REED_TOP_GPIO_Port, REED_TOP_Pin) != REED_TOP_ON) {
+
+        // Tidur 1ms agar CPU bisa mengerjakan Task lain
+        vTaskDelay(pdMS_TO_TICKS(1));
+
+        // 3. Cek Timeout (Mekanik macet / angin kompresor habis)
+        if ((HAL_GetTick() - startTime) > eepromSettings.time_out_pneumatic_ms) {
+            isAborted = true;        // Kunci mesin (Emergency)
+            // kode_alarm_sistem = 102; // Error Silinder Gagal Naik
+            return false;            // Lapor Gagal!
+        }
+
+        // 4. Lapor ke Watchdog agar tidak di-reset
+        heartbeat_Sequencer = true;
+    }
+
+    // 5. Silinder sudah di atas, tahan posisinya
+    Silinder_Hold();
+
+    return true; // Lapor Sukses!
+}
+
 void Perform_Homing_Sequence(void) {
     Update_Motor_Param_Homing_From_Settings();
+
+    if (!Homing_Silinder_Z()) return;
+//    {
+		// Jika gagal naik (timeout), tahan Task di sini (jangan lanjut Homing XY)
+		// Tunggu operator menekan tombol Reset/Clear Alarm di HMI
+//		while (isAborted) {
+//			vTaskDelay(pdMS_TO_TICKS(100));
+//			heartbeat_Sequencer = true;
+//		}
+//	}
+
 
     // --- TAHAP 1: SEEK ---
     isNavigating = true;
@@ -263,13 +304,13 @@ void Perform_Auto_Weld_Cycle(void) {
 }
 
 void Perform_Manual_Jog(void) {
-    long jogManX_mm = (long)( ((uint32_t)Holding_Registers[7] << 16) | (uint32_t)Holding_Registers[6] );
-    long jogManY_mm = (long)( ((uint32_t)Holding_Registers[9] << 16) | (uint32_t)Holding_Registers[8] );
-    long jogManZ_mm = (long)( ((uint32_t)Holding_Registers[11] << 16) | (uint32_t)Holding_Registers[10] );
+	int16_t jogManX_mm = (int16_t)Holding_Registers[6];
+	int16_t jogManY_mm = (int16_t)Holding_Registers[8];
+	int16_t jogManZ_mm = (int16_t)Holding_Registers[10];
 
-    long targetAbsX = motorX.getCurrentPositionPulse() + Convert_mm_to_PulseX(jogManX_mm);
-    long targetAbsY = motorY.getCurrentPositionPulse() + Convert_mm_to_PulseY(jogManY_mm);
-    long targetAbsZ = motorZ.getCurrentPositionPulse() + Convert_mm_to_PulseZ(jogManZ_mm);
+	int32_t targetAbsX = motorX.getCurrentPositionPulse() + Convert_mm_to_PulseX(jogManX_mm);
+	int32_t targetAbsY = motorY.getCurrentPositionPulse() + Convert_mm_to_PulseY(jogManY_mm);
+	int32_t targetAbsZ = motorZ.getCurrentPositionPulse() + Convert_mm_to_PulseZ(jogManZ_mm);
 
     isNavigating = true;
     motorX.setTargetPulse(targetAbsX);
@@ -282,7 +323,9 @@ void Perform_Manual_Jog(void) {
     isPerformManualJog = false;
 
     // Reset Register
-    for(int i = 6; i <= 11; i++) Holding_Registers[i] = 0;
+    Holding_Registers[6] = 0;
+	Holding_Registers[8] = 0;
+	Holding_Registers[10] = 0;
 }
 
 bool Eksekusi_Las(uint16_t waktu_las_ms) {
@@ -347,6 +390,8 @@ bool Eksekusi_Las(uint16_t waktu_las_ms) {
 
         heartbeat_Sequencer = true;
     }
+
+    Silinder_Hold();
 
     // Jika sampai di sini, siklus selesai dengan sempurna!
     return true;
