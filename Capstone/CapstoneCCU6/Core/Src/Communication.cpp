@@ -14,6 +14,8 @@
 
 uint16_t tesreset = 0;
 
+uint8_t txBuffer[256];
+
 // --- Konstanta Modbus ---
 const uint16_t MODBUS_COIL_ON = 0xFF00;
 const uint8_t  MODBUS_EXCEPTION_ILLEGAL_FUNCTION   = 0x01;
@@ -185,6 +187,21 @@ extern "C" void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
     }
 }
 
+// ========================================================
+// 3. CALLBACK SAAT TRANSMISI SELESAI PENGIRIMAN
+// ========================================================
+// Fungsi ini otomatis dipanggil oleh hardware saat byte terakhir keluar dari kabel
+extern "C" void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart) {
+    if (huart->Instance == USART1) {
+
+        // PENTING: Reset index penerima ke 0
+        rxIndex = 0;
+
+        // Buka telinga lagi untuk mendengarkan HMI
+        HAL_UART_Receive_IT(&huart1, &rxChar, 1);
+    }
+}
+
 // -----------------------------------------------------
 // FUNC 0x01: READ COILS
 // -----------------------------------------------------
@@ -196,7 +213,11 @@ void Function_Code_01_READ_COILS(uint8_t* rxBufferInput, uint8_t len) {
     // 2. Validasi Batas Alamat (Gunakan MAX_COILS dari enum kita sebelumnya)
     if ((start_addr + quantity) <= MAX_COILS_READABLE) {
 
-        uint8_t txBuffer[256];
+    	if (huart1.gState != HAL_UART_STATE_READY) {
+			return;
+		}
+
+//        uint8_t txBuffer[256];
 
         // 3. Hitung Jumlah Byte Data
         // Rumus membagi 8 dengan pembulatan ke atas (ceiling)
@@ -235,7 +256,7 @@ void Function_Code_01_READ_COILS(uint8_t* rxBufferInput, uint8_t len) {
 
         // 8. Kirim Balasan ke HMI via RS485
         vTaskDelay(pdMS_TO_TICKS(5));
-        HAL_UART_Transmit(&huart1, txBuffer, 5 + byte_count,100);
+        HAL_UART_Transmit_DMA(&huart1, txBuffer, 5 + byte_count);
 
     } else {
         // HMI meminta alamat di luar batas (Misal minta Coil ke-99)
@@ -276,7 +297,11 @@ void Function_Code_02_READ_DISCRETE_INPUT(uint8_t* rxBufferInput, uint8_t len) {
     // 2. Validasi Batas Alamat
     if ((start_addr + quantity) <= TOTAL_DISCRETE_INPUT) {
 
-        uint8_t txBuffer[256];
+    	if (huart1.gState != HAL_UART_STATE_READY) {
+			return;
+		}
+
+//        uint8_t txBuffer[256];
 
         // 3. Hitung Jumlah Byte Data (Pembulatan ke atas)
         uint8_t byte_count = (quantity + 7) / 8;
@@ -312,7 +337,7 @@ void Function_Code_02_READ_DISCRETE_INPUT(uint8_t* rxBufferInput, uint8_t len) {
 
         // 8. Kirim Balasan ke HMI
         vTaskDelay(pdMS_TO_TICKS(5));
-        HAL_UART_Transmit(&huart1, txBuffer, 5 + byte_count,100);
+        HAL_UART_Transmit_DMA(&huart1, txBuffer, 5 + byte_count);
 
     } else {
         // HMI meminta alamat di luar batas Hardware yang ada
@@ -355,9 +380,13 @@ void Function_Code_03_READ_HOLDING_REGISTER(uint8_t* rxBufferInput, uint8_t len)
     // Pengecekan batas aman memori Modbus
     if (start_addr + quantity <= TOTAL_HOLDING_REGISTERS) {
 
+    	if (huart1.gState != HAL_UART_STATE_READY) {
+			return;
+		}
+
         // Modbus bisa meminta hingga 125 register (250 byte),
         // pastikan buffer cukup besar (maks standar Modbus RTU adalah 256 byte)
-        uint8_t txBuffer[256];
+//        uint8_t txBuffer[256];
         uint8_t byte_count = quantity * 2;
 
         txBuffer[0] = rxBufferInput[0]; // Slave ID
@@ -379,7 +408,7 @@ void Function_Code_03_READ_HOLDING_REGISTER(uint8_t* rxBufferInput, uint8_t len)
         vTaskDelay(pdMS_TO_TICKS(5));
 
         // Kirim balasan ke HMI/PC
-        HAL_UART_Transmit(&huart1, txBuffer, 5 + byte_count,100);
+        HAL_UART_Transmit_DMA(&huart1, txBuffer, 5 + byte_count);
 
     } else {
         // Alamat melebihi batas, kirim Exception 0x02 (Illegal Data Address)
@@ -396,7 +425,12 @@ void Function_Code_04_READ_INPUT_REGISTER(uint8_t* rxBufferInput, uint8_t len) {
 
     // Asumsi TOTAL_INPUT_REGISTERS didefinisikan sebagai macro (misal: 10)
     if (start_addr + quantity <= TOTAL_INPUT_REGISTER) {
-        uint8_t txBuffer[32];
+
+    	if (huart1.gState != HAL_UART_STATE_READY) {
+			return;
+		}
+
+//        uint8_t txBuffer[32];
         uint8_t byte_count = quantity * 2;
 
         txBuffer[0] = rxBufferInput[0]; // Slave ID
@@ -413,7 +447,7 @@ void Function_Code_04_READ_INPUT_REGISTER(uint8_t* rxBufferInput, uint8_t len) {
         txBuffer[4 + byte_count] = (crc_tx >> 8) & 0xFF;
 
         vTaskDelay(pdMS_TO_TICKS(5));
-        HAL_UART_Transmit(&huart1, txBuffer, 5 + byte_count,100);
+        HAL_UART_Transmit_DMA(&huart1, txBuffer, 5 + byte_count);
     } else {
         // Alamat melebihi batas, kirim Exception 0x02 (Illegal Data Address)
         Send_Modbus_Exception(rxBufferInput[0], 0x04, MODBUS_EXCEPTION_ILLEGAL_ADDRESS);
@@ -530,8 +564,9 @@ void Function_Code_05_WRITE_SINGLE_COIL(uint8_t* rxBufferInput, uint8_t len) {
 
     // Hanya kirim Echo (ACK) jika semua proses aman dan tidak ada Exception
     if (send_echo) {
+
         vTaskDelay(pdMS_TO_TICKS(5));
-        HAL_UART_Transmit(&huart1, rxBufferInput, len,100);
+        HAL_UART_Transmit_DMA(&huart1, rxBufferInput, len);
     }
 }
 // -----------------------------------------------------
@@ -621,8 +656,9 @@ void Function_Code_06_WRITE_SINGLE_REGISTER(uint8_t* rxBufferInput, uint8_t len)
 
         // Kirim Balasan Sukses (ACK)
         // Di FC06, balasan sukses adalah mengirim ulang pesan request (Echo)
+
         vTaskDelay(pdMS_TO_TICKS(5));
-        HAL_UART_Transmit(&huart1, rxBufferInput, len,100);
+        HAL_UART_Transmit_DMA(&huart1, rxBufferInput, len);
     }
 }
 
@@ -669,6 +705,6 @@ void Send_Modbus_Exception(uint8_t slave_id, uint8_t function_code, uint8_t exce
     txBuffer[4] = (crc_tx >> 8) & 0xFF;
 
     vTaskDelay(pdMS_TO_TICKS(5));
-    HAL_UART_Transmit(&huart1, txBuffer, 5, 100);
+    HAL_UART_Transmit_DMA(&huart1, txBuffer, 5);
 }
 
