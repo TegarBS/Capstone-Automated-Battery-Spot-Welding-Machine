@@ -164,3 +164,18 @@ bool Delay_With_Watchdog(uint32_t total_delay_ms, volatile bool &heartbeat) {
     }
     return true;
 }
+
+void Silinder_Up(void){
+	HAL_GPIO_WritePin(RELAY_DOWN_GPIO_Port, RELAY_DOWN_Pin, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(RELAY_UP_GPIO_Port, RELAY_UP_Pin, GPIO_PIN_SET);
+}
+
+void Silinder_Down(void){
+	HAL_GPIO_WritePin(RELAY_UP_GPIO_Port, RELAY_UP_Pin, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(RELAY_DOWN_GPIO_Port, RELAY_DOWN_Pin, GPIO_PIN_SET);
+}
+
+void Silinder_Hold(void){
+	HAL_GPIO_WritePin(RELAY_UP_GPIO_Port, RELAY_UP_Pin, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(RELAY_DOWN_GPIO_Port, RELAY_DOWN_Pin, GPIO_PIN_RESET);
+}

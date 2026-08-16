@@ -14,8 +14,6 @@
 #include "FungsiEEPROM.h"
 #include "Monitor.h"
 
-
-
 void Task_Sequencer(void *pvParameters);
 
 bool Wait_Motors_Reach_Target(bool includeZ);
@@ -23,15 +21,7 @@ void Handle_Emergency_Abort(void);
 void Perform_Homing_Sequence(void);
 void Perform_Auto_Weld_Cycle(void);
 void Perform_Manual_Jog(void);
-
-
-// Definisi Pin Fiktif untuk Relay dan Las
-#ifndef RELAY_Z_PORT
-#define RELAY_Z_PORT GPIOB
-#define RELAY_Z_PIN GPIO_PIN_10
-#define WELD_PORT GPIOB
-#define WELD_PIN GPIO_PIN_11
-#endif
+bool Eksekusi_Las(uint16_t waktu_las_ms);
 
 StepperMotor motorX(STEP_X_GPIO_Port, STEP_X_Pin, DIR_X_GPIO_Port, DIR_X_Pin, &htim2);
 StepperMotor motorY(STEP_Y_GPIO_Port, STEP_Y_Pin, DIR_Y_GPIO_Port, DIR_Y_Pin, &htim3);
@@ -91,6 +81,15 @@ void Task_Sequencer(void *pvParameters) {
         else if (isPerformManualJog) {
             Perform_Manual_Jog();
         }
+        else if (isPerformWeld && !isAutoWeldActive && !isNavigating) {
+    		if (!Eksekusi_Las(eepromSettings.weld_time)) {
+    			// TERJADI ERROR PNEUMATIK!
+    			isAborted = true;
+    			continue;             // Hentikan seluruh mesin
+    			//Kirim_Pesan_Error_Ke_HMI();   // Beritahu layar Haiwell
+    		}
+    		isPerformWeld = false;
+        }
         else {
             // =========================================================
             // E. MODE STANDBY PURE (Menunggu Perintah)
@@ -123,12 +122,14 @@ void Handle_Emergency_Abort(void) {
     isAutoWeldActive = false;
 	isPerformHoming = false;
 	isPerformManualJog = false;
+	isPerformWeld = false;
 
     isAborted = false;
     isMachineHomed = false;
 
-    HAL_GPIO_WritePin(RELAY_Z_PORT, RELAY_Z_PIN, GPIO_PIN_RESET);
-    HAL_GPIO_WritePin(WELD_PORT, WELD_PIN, GPIO_PIN_RESET);
+    Silinder_Up();
+
+    //WELD OFF ALL PIN
 
     motorX.stop();
     motorY.stop();
@@ -159,11 +160,7 @@ void Perform_Homing_Sequence(void) {
     motorX.setTargetPulse(Convert_mm_to_PulseX(eepromSettings.homingTravelAfterLimitX));
     motorY.setTargetPulse(Convert_mm_to_PulseY(eepromSettings.homingTravelAfterLimitY));
 
-    if (!Wait_Motors_Reach_Target()) {
-		isNavigating = false;
-		isPerformHoming = false; // Batalkan niat homing
-		return; // Keluar dari fungsi ini SEKARANG JUGA!
-	}
+    if (!Wait_Motors_Reach_Target()) return;
 
     ignoreLimitSwitch = false;
 
@@ -220,16 +217,17 @@ void Perform_Auto_Weld_Cycle(void) {
         if (!Wait_Motors_Reach_Target()) return; // Gagal / Batal
         isNavigating = false;
 
-//        // --- Eksekusi Las dengan Helper Delay ---
-//        HAL_GPIO_WritePin(RELAY_Z_PORT, RELAY_Z_PIN, GPIO_PIN_SET);
-//        if (!Delay_With_Watchdog(Holding_Registers[4])) return; // Drop Delay
-//
-//        HAL_GPIO_WritePin(WELD_PORT, WELD_PIN, GPIO_PIN_SET);
-//        vTaskDelay(pdMS_TO_TICKS(Holding_Registers[5])); // Weld Time
-//        HAL_GPIO_WritePin(WELD_PORT, WELD_PIN, GPIO_PIN_RESET);
-//
-//        HAL_GPIO_WritePin(RELAY_Z_PORT, RELAY_Z_PIN, GPIO_PIN_RESET);
-//        if (!Delay_With_Watchdog(200)) return; // Pneumatic Rise Delay
+        isPerformWeld = true;
+
+		if (!Eksekusi_Las(eepromSettings.weld_time)) {
+			// TERJADI ERROR PNEUMATIK!
+			isAborted = true;
+			return;             // Hentikan seluruh mesin
+			//Kirim_Pesan_Error_Ke_HMI();   // Beritahu layar Haiwell
+		}
+
+		isPerformWeld = false;
+
         Delay_With_Watchdog(500, heartbeat_Sequencer);
     }
 
@@ -260,6 +258,8 @@ void Perform_Auto_Weld_Cycle(void) {
 		}
 
 	}
+
+	isPerformWeld = false;
 }
 
 void Perform_Manual_Jog(void) {
@@ -276,11 +276,78 @@ void Perform_Manual_Jog(void) {
     motorY.setTargetPulse(targetAbsY);
     motorZ.setTargetPulse(targetAbsZ);
 
-    Wait_Motors_Reach_Target(true); // Termasuk motor Z
+    if (!Wait_Motors_Reach_Target(true)) return;
 
     isNavigating = false;
     isPerformManualJog = false;
 
     // Reset Register
     for(int i = 6; i <= 11; i++) Holding_Registers[i] = 0;
+}
+
+bool Eksekusi_Las(uint16_t waktu_las_ms) {
+	uint32_t startTime;
+    // ==========================================================
+    // 1. SILINDER TURUN
+    // ==========================================================
+    Silinder_Down();
+    startTime = HAL_GetTick();
+
+    if (isAborted) return false;
+
+    // ==========================================================
+    // 2. MENUNGGU REED SWITCH BAWAH TERSENTUH
+    // ==========================================================
+    while (HAL_GPIO_ReadPin(REED_BOTTOM_GPIO_Port, REED_BOTTOM_Pin) != REED_BOTTOM_ON) {
+
+        // Tidurkan Task 1 milidetik agar CPU bisa mengurus komunikasi HMI & Task Lain
+        vTaskDelay(pdMS_TO_TICKS(1));
+
+        // Pengecekan Timeout (Jika macet lebih dari 2 detik)
+        if ((HAL_GetTick() - startTime) > eepromSettings.time_out_pneumatic_ms) {
+            Silinder_Up();// Paksa naikkan silinder
+            //kode_alarm_sistem = 101; // Contoh: Error Silinder Gagal Turun
+            return false;
+        }
+
+        // Tendang Watchdog agar tidak reset saat menunggu
+        heartbeat_Sequencer = true;
+    }
+
+    if (isAborted) return false;
+
+    // [TIPS INDUSTRI]: Beri jeda sedikit setelah sensor tersentuh agar
+    // tekanan pneumatik benar-benar padat ke nikel baterai sebelum arus listrik ditembakkan.
+//    vTaskDelay(pdMS_TO_TICKS(SETTLING_TIME_MS));
+
+    // ==========================================================
+    // 3. PERFORM LAS (TEMBAKKAN ARUS)
+    // ==========================================================
+//    HAL_GPIO_WritePin(WELD_PORT, WELD_PIN, GPIO_PIN_SET); // Relay/Triac ON
+//    vTaskDelay(pdMS_TO_TICKS(waktu_las_ms));              // Tunggu selama waktu las
+//    HAL_GPIO_WritePin(WELD_PORT, WELD_PIN, GPIO_PIN_RESET); // Relay/Triac OFF
+
+    // ==========================================================
+    // 4. SILINDER NAIK
+    // ==========================================================
+    Silinder_Up();
+    startTime = HAL_GetTick();
+
+    // ==========================================================
+    // 5. MENUNGGU REED SWITCH ATAS TERSENTUH (POSISI AMAN)
+    // ==========================================================
+    while (HAL_GPIO_ReadPin(REED_TOP_GPIO_Port, REED_TOP_Pin) != REED_TOP_ON) {
+
+        vTaskDelay(pdMS_TO_TICKS(1));
+
+        if ((HAL_GetTick() - startTime) > eepromSettings.time_out_pneumatic_ms) {
+            //kode_alarm_sistem = 102; // Contoh: Error Silinder Gagal Naik
+            return false; // Berhenti dan lapor error
+        }
+
+        heartbeat_Sequencer = true;
+    }
+
+    // Jika sampai di sini, siklus selesai dengan sempurna!
+    return true;
 }

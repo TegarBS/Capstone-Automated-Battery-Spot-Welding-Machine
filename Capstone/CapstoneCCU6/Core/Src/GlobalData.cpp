@@ -23,6 +23,9 @@ GPIO_PinState LIMIT_X_Pressed = GPIO_PIN_SET;
 GPIO_PinState LIMIT_Y_Pressed = GPIO_PIN_SET;
 GPIO_PinState LIMIT_Z_Pressed = GPIO_PIN_SET;
 
+GPIO_PinState REED_TOP_ON		= GPIO_PIN_SET;
+GPIO_PinState REED_BOTTOM_ON	= GPIO_PIN_SET;
+
 // =========================================================
 // VARIABEL GLOBAL STATUS & ALARM
 // =========================================================
@@ -48,6 +51,7 @@ volatile bool isAutoWeldActive = false;
 volatile bool isPerformManualJog = false;
 volatile bool isMachineHomed = false;
 volatile bool isFirstWeldCycle = false;
+volatile bool isPerformWeld = false;
 
 // =========================================================
 // [RTOS HANDLES]

@@ -30,6 +30,7 @@ enum ModbusCoilAddress {
     COIL_REQUEST_HOMING  = 0x0002,
     COIL_PAUSE_RESUME    = 0x0003,
     COIL_MANUAL_JOG      = 0x0004,
+	COIL_MANUAL_WELD     = 0x0005,
 
     COIL_SAVE_TO_FLASH   = 0x000A,
     COIL_RESET_SYSTEM    = 0x000B,
@@ -55,6 +56,8 @@ enum ModbusDiscreteInput {
     DI_LIMIT_SWITCH_Z   = 0x0002,
 	DI_IS_MACHINE_HOMED = 0x0003,
 	DI_IS_MACHINE_RUN   = 0x0004,
+	DI_REED_TOP			= 0x0005,
+	DI_REED_BOTTOM		= 0x0006,
 
 };
 
@@ -281,6 +284,9 @@ bool Baca_Status_Coil(uint16_t coil_addr) {
         case COIL_MANUAL_JOG:
             return isPerformManualJog;
 
+        case COIL_MANUAL_WELD:
+        	return isPerformWeld;
+
         default:
             return false; // Alamat tidak valid
     }
@@ -363,6 +369,12 @@ bool Baca_Discrete_Input(uint16_t input_addr) {
 
         case DI_IS_MACHINE_RUN:
         	return HAL_GPIO_ReadPin(LED_GPIO_Port, LED_Pin) == GPIO_PIN_SET;
+
+        case DI_REED_TOP:
+        	return HAL_GPIO_ReadPin(REED_TOP_GPIO_Port, REED_TOP_Pin) == REED_TOP_ON;
+
+        case DI_REED_BOTTOM:
+        	return HAL_GPIO_ReadPin(REED_BOTTOM_GPIO_Port, REED_BOTTOM_Pin) == REED_BOTTOM_ON;
 
         default:
             return false; // Jika alamat tidak terdaftar
@@ -468,7 +480,7 @@ void Function_Code_05_WRITE_SINGLE_COIL(uint8_t* rxBufferInput, uint8_t len) {
         case COIL_START_AUTO_WELD:
             if (coil_val == MODBUS_COIL_ON) {
 
-            	if (isPerformHoming || isPerformManualJog){
+            	if (isPerformHoming || isPerformManualJog || isPerformWeld){
             		Send_Modbus_Exception(rxBufferInput[0], 0x05, MODBUS_EXCEPTION_BUSY);
     				send_echo = false; // Batal kirim ACK
     				break;             // Langsung lompat keluar dari blok case ini
@@ -502,7 +514,7 @@ void Function_Code_05_WRITE_SINGLE_COIL(uint8_t* rxBufferInput, uint8_t len) {
 
         case COIL_REQUEST_HOMING:
             if (coil_val == MODBUS_COIL_ON) {
-            	if (isAutoWeldActive || isPerformManualJog){
+            	if (isAutoWeldActive || isPerformManualJog || isPerformWeld){
             		Send_Modbus_Exception(rxBufferInput[0], 0x05, MODBUS_EXCEPTION_BUSY);
     				send_echo = false; // Batal kirim ACK
     				break;             // Langsung lompat keluar dari blok case ini
@@ -517,7 +529,7 @@ void Function_Code_05_WRITE_SINGLE_COIL(uint8_t* rxBufferInput, uint8_t len) {
 
         case COIL_MANUAL_JOG:
             if (coil_val == MODBUS_COIL_ON) {
-            	if (isPerformHoming || isAutoWeldActive){
+            	if (isPerformHoming || isAutoWeldActive || isPerformWeld){
             		Send_Modbus_Exception(rxBufferInput[0], 0x05, MODBUS_EXCEPTION_BUSY);
     				send_echo = false; // Batal kirim ACK
     				break;             // Langsung lompat keluar dari blok case ini
@@ -552,6 +564,17 @@ void Function_Code_05_WRITE_SINGLE_COIL(uint8_t* rxBufferInput, uint8_t len) {
             // Cabut sabuk pengaman motor Z
             if (coil_val == MODBUS_COIL_ON) {
                 motorZ.unlockPosition();
+            }
+            break;
+
+        case COIL_MANUAL_WELD:
+            if (coil_val == MODBUS_COIL_ON) {
+            	if (isPerformHoming || isAutoWeldActive || isPerformManualJog || isNavigating){
+            		Send_Modbus_Exception(rxBufferInput[0], 0x05, MODBUS_EXCEPTION_BUSY);
+    				send_echo = false; // Batal kirim ACK
+    				break;             // Langsung lompat keluar dari blok case ini
+            	}
+                isPerformWeld = true;
             }
             break;
 

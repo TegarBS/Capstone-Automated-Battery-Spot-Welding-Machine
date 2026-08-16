@@ -19,7 +19,7 @@
 #define TOTAL_DISCRETE_INPUT 10
 
 #define EEPROM_START_MODBUS_REG 20
-#define TOTAL_EEPROM_PARAMS 28
+#define TOTAL_EEPROM_PARAMS 30
 
 #define SKALA_FLOAT 100.0f
 
@@ -75,6 +75,9 @@ typedef struct __attribute__((aligned(4))){
     uint16_t X_distance_from_0;
     uint16_t Y_distance_from_0;
 
+    uint16_t time_out_pneumatic_ms;
+    uint16_t weld_time;
+
 } PermanentSettings_t;
 
 extern PermanentSettings_t eepromSettings;
@@ -104,6 +107,9 @@ extern GPIO_PinState LIMIT_X_Pressed;
 extern GPIO_PinState LIMIT_Y_Pressed;
 extern GPIO_PinState LIMIT_Z_Pressed;
 
+extern GPIO_PinState REED_TOP_ON;
+extern GPIO_PinState REED_BOTTOM_ON;
+
 extern uint16_t kode_alarm_sistem;
 
 // =========================================================
@@ -125,6 +131,7 @@ extern volatile bool isAutoWeldActive;
 extern volatile bool isPerformManualJog;
 extern volatile bool isMachineHomed;
 extern volatile bool isFirstWeldCycle;
+extern volatile bool isPerformWeld;
 
 // =========================================================
 // [RTOS HANDLES]

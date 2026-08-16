@@ -45,4 +45,8 @@ void Update_Motor_Param_Homing_From_Settings(void);
 // ---------------------------------------------------------
 bool Delay_With_Watchdog(uint32_t total_delay_ms, volatile bool &heartbeat);
 
+void Silinder_Up(void);
+void Silinder_Down(void);
+void Silinder_Hold(void);
+
 #endif /* SRC_UTILITASDANPERHITUNGAN_H_ */

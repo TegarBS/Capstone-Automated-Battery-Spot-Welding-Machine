@@ -150,4 +150,7 @@ void Load_Default_Value(void){
 
     eepromSettings.X_distance_from_0 = 90;
     eepromSettings.Y_distance_from_0 = 90;
+
+    eepromSettings.time_out_pneumatic_ms = 2000;
+    eepromSettings.weld_time = 20;
 }
