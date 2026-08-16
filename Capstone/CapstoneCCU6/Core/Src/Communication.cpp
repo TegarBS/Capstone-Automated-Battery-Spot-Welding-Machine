@@ -16,10 +16,10 @@ uint16_t tesreset = 0;
 
 // --- Konstanta Modbus ---
 const uint16_t MODBUS_COIL_ON = 0xFF00;
-const uint8_t  MODBUS_EXCEPTION_ILLEGAL_ADDRESS    = 0x02;
-const uint8_t  MODBUS_EXCEPTION_BUSY               = 0x06;
 const uint8_t  MODBUS_EXCEPTION_ILLEGAL_FUNCTION   = 0x01;
+const uint8_t  MODBUS_EXCEPTION_ILLEGAL_ADDRESS    = 0x02;
 const uint8_t  MODBUS_EXCEPTION_ILLEGAL_DATA_VALUE = 0x03;
+const uint8_t  MODBUS_EXCEPTION_BUSY               = 0x06;
 
 // --- Daftar Alamat Coil ---
 enum ModbusCoilAddress {
@@ -29,10 +29,10 @@ enum ModbusCoilAddress {
     COIL_PAUSE_RESUME    = 0x0003,
     COIL_MANUAL_JOG      = 0x0004,
 
-    COIL_SAVE_TO_FLASH   = 0x0000A,
-    COIL_RESET_SYSTEM    = 0x0000B,
-	COIL_CMD_ZERO_Z      = 0x0000C,
-	COIL_CMD_UNLOCK_Z    = 0x0000D,
+    COIL_SAVE_TO_FLASH   = 0x000A,
+    COIL_RESET_SYSTEM    = 0x000B,
+	COIL_CMD_ZERO_Z      = 0x000C,
+	COIL_CMD_UNLOCK_Z    = 0x000D,
 
 	MAX_COILS_READABLE   = 10
 };
@@ -53,6 +53,18 @@ enum ModbusDiscreteInput {
     DI_LIMIT_SWITCH_Z   = 0x0002,
 	DI_IS_MACHINE_HOMED = 0x0003,
 	DI_IS_MACHINE_RUN   = 0x0004,
+
+};
+
+enum ModbusHoldingRegister {
+	TOTAL_KOLOM 	= 0x0000,
+	TOTAL_BARIS		= 0x0001,
+	PITCH_X			= 0x0002,
+	PITCH_Y 		= 0x0003,
+	KOLOM_START 	= 0x0004,
+	BARIS_START 	= 0x0005,
+
+	ALERT 			= 0x000C,
 
 };
 
@@ -125,6 +137,8 @@ void Task_Komunikasi(void *pvParameters) {
 // cppcheck-suppress constParameterPointer
 extern "C" void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
     if (huart->Instance == USART1) {
+
+
 
         rxBuffer[rxIndex++] = rxChar;
 
@@ -420,6 +434,13 @@ void Function_Code_05_WRITE_SINGLE_COIL(uint8_t* rxBufferInput, uint8_t len) {
         case COIL_START_AUTO_WELD:
             if (coil_val == MODBUS_COIL_ON) {
 
+            	if (isPerformHoming || isPerformManualJog){
+            		Send_Modbus_Exception(rxBufferInput[0], 0x05, MODBUS_EXCEPTION_BUSY);
+    				send_echo = false; // Batal kirim ACK
+    				break;             // Langsung lompat keluar dari blok case ini
+            	}
+
+
             	//if ()
 
                 // --- 1. PRE-FLIGHT CHECK (SABUK PENGAMAN) ---
@@ -447,6 +468,11 @@ void Function_Code_05_WRITE_SINGLE_COIL(uint8_t* rxBufferInput, uint8_t len) {
 
         case COIL_REQUEST_HOMING:
             if (coil_val == MODBUS_COIL_ON) {
+            	if (isAutoWeldActive || isPerformManualJog){
+            		Send_Modbus_Exception(rxBufferInput[0], 0x05, MODBUS_EXCEPTION_BUSY);
+    				send_echo = false; // Batal kirim ACK
+    				break;             // Langsung lompat keluar dari blok case ini
+            	}
                 isPerformHoming = true;
             }
             break;
@@ -457,6 +483,11 @@ void Function_Code_05_WRITE_SINGLE_COIL(uint8_t* rxBufferInput, uint8_t len) {
 
         case COIL_MANUAL_JOG:
             if (coil_val == MODBUS_COIL_ON) {
+            	if (isPerformHoming || isAutoWeldActive){
+            		Send_Modbus_Exception(rxBufferInput[0], 0x05, MODBUS_EXCEPTION_BUSY);
+    				send_echo = false; // Batal kirim ACK
+    				break;             // Langsung lompat keluar dari blok case ini
+            	}
                 isPerformManualJog = true;
             }
             break;
@@ -521,7 +552,7 @@ void Function_Code_06_WRITE_SINGLE_REGISTER(uint8_t* rxBufferInput, uint8_t len)
 
     // 3. Validasi dan Konversi Data Sesuai Alamatnya
     switch (alamat_offset) {
-        case 0: // Total Kolom
+        case TOTAL_KOLOM: // Total Kolom
             if (data_baru == 0) {
                 // Tidak mungkin ada las baterai dengan 0 kolom
                 Send_Modbus_Exception(rxBufferInput[0], 0x06, MODBUS_EXCEPTION_ILLEGAL_DATA_VALUE);
@@ -531,7 +562,7 @@ void Function_Code_06_WRITE_SINGLE_REGISTER(uint8_t* rxBufferInput, uint8_t len)
             }
             break;
 
-        case 1: // Total Baris
+        case TOTAL_BARIS: // Total Baris
             if (data_baru == 0) {
                 // Tidak mungkin ada las baterai dengan 0 baris
                 Send_Modbus_Exception(rxBufferInput[0], 0x06, MODBUS_EXCEPTION_ILLEGAL_DATA_VALUE);
@@ -541,7 +572,7 @@ void Function_Code_06_WRITE_SINGLE_REGISTER(uint8_t* rxBufferInput, uint8_t len)
             }
             break;
 
-        case 2: // Jarak Pitch X
+        case PITCH_X: // Jarak Pitch X
             if (data_baru == 0) {
                 Send_Modbus_Exception(rxBufferInput[0], 0x06, MODBUS_EXCEPTION_ILLEGAL_DATA_VALUE);
                 isDataValid = false; // Tandai bahwa data ini cacat!
@@ -550,7 +581,7 @@ void Function_Code_06_WRITE_SINGLE_REGISTER(uint8_t* rxBufferInput, uint8_t len)
             }
             break;
 
-        case 3: // Jarak Pitch Y
+        case PITCH_Y: // Jarak Pitch Y
             if (data_baru == 0) {
                 Send_Modbus_Exception(rxBufferInput[0], 0x06, MODBUS_EXCEPTION_ILLEGAL_DATA_VALUE);
                 isDataValid = false; // Tandai cacat!
@@ -559,15 +590,15 @@ void Function_Code_06_WRITE_SINGLE_REGISTER(uint8_t* rxBufferInput, uint8_t len)
             }
             break;
 
-        case 4:
+        case KOLOM_START:
             configLas.startKolom = (data_baru > 0) ? (data_baru - 1) : 0;
             break;
 
-        case 5:
+        case BARIS_START:
             configLas.startBaris = (data_baru > 0) ? (data_baru - 1) : 0;
             break;
 
-        case 12:
+        case ALERT:
         	kode_alarm_sistem = data_baru;
         	break;
 

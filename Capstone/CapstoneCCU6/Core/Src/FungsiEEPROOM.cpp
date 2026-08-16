@@ -9,6 +9,8 @@
 #include "GlobalData.h"
 #include <string.h>
 
+uint16_t eeprom=0;
+
 #define FLASH_EEPROM_ADDR 0x08020000 // Alamat awal Sektor 5 di STM32F401
 #define MAGIC_NUMBER 0xABCD1234      // Kode rahasia penanda Flash valid
 
@@ -32,6 +34,8 @@ void Load_Settings_From_Flash(void) {
 // --- FUNGSI MENYIMPAN KE FLASH (DENGAN SAFETY INTERLOCK) ---
 bool Save_Settings_To_Flash(void) {
 
+	eeprom++;
+
     // ==========================================================
     // 1. SAFETY INTERLOCK (PENCEGAHAN CRASH)
     // Jangan izinkan penyimpanan jika mesin sedang melakukan aktivitas kritis!
@@ -39,14 +43,17 @@ bool Save_Settings_To_Flash(void) {
     if (isAutoWeldActive || isPerformManualJog || isPerformHoming || isNavigating) {
         return false; // TOLAK PERINTAH! Mesin sedang sibuk
     }
+    eeprom++;
 
 
 	if (motorX.isMoving() || motorY.isMoving() || motorZ.isMoving()) {
 		return false; // TOLAK PERINTAH! Motor sedang berputar
 	}
+	eeprom++;
 
     // 2. Ambil data terbaru dari Holding Registers HMI
     Ambil_Data_Dari_Holding_Register();
+    eeprom++;
 
     // 3. MATIKAN SELURUH AKTIVITAS HARDWARE (GLOBAL DISABLE)
     __disable_irq();
@@ -78,6 +85,8 @@ bool Save_Settings_To_Flash(void) {
     // 8. NYALAKAN KEMBALI SELURUH AKTIVITAS HARDWARE
     __enable_irq();
 
+
+    eeprom++;
     return true; // Penyimpanan Berhasil
 }
 
