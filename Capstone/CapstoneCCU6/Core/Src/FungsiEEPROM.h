@@ -8,8 +8,10 @@
 #ifndef SRC_FUNGSIEEPROM_H_
 #define SRC_FUNGSIEEPROM_H_
 
-void Load_Settings_From_Flash(void);
-bool Save_Settings_To_Flash(void);
+void Task_Storage(void *pvParameters);
+
+void Load_Settings_From_EEPROM(void);
+bool Save_Settings_To_EEPROM(void);
 
 void Load_Default_Value(void);
 void Salin_Data_Ke_Register(void);

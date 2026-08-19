@@ -49,24 +49,29 @@ void MachineApp_Init(void) {
 	// jika tidak, status IWDG akan terus terbaca di reset berikutnya!
 	__HAL_RCC_CLEAR_RESET_FLAGS();
 
-	Load_Settings_From_Flash();
-
     // Buat Semaphore & Queue
     SinyalPosisiTercapai = xSemaphoreCreateBinary();
     Sem_DataDiterima = xSemaphoreCreateBinary();
+    Sem_MintaSave = xSemaphoreCreateBinary();
 
     // Buat Task RTOS
     xTaskCreate(Task_Sequencer, "Task_Seq", 512, NULL, 2, NULL);
     xTaskCreate(Task_Komunikasi, "Task_Komunikasi", 512, NULL, 2, NULL);
     xTaskCreate(Task_Monitor, "Task_Mon", 256, NULL, 1, NULL);
-
-    Update_Motor_Param_From_Settings();
+    xTaskCreate(Task_Storage, "Task_Storage", 256, NULL, 1, NULL);
 }
 
 void MachineApp_Loop(void) {}
 
 void Task_Sequencer(void *pvParameters) {
 	Delay_With_Watchdog(500, heartbeat_Sequencer); // Jeda inisialisasi hardware
+
+	Load_Settings_From_EEPROM();
+	Update_Motor_Param_From_Settings();
+
+	HAL_GPIO_WritePin(STEP_X_GPIO_Port, STEP_X_Pin , GPIO_PIN_SET);
+	HAL_GPIO_WritePin(STEP_Y_GPIO_Port, STEP_Y_Pin , GPIO_PIN_SET);
+	HAL_GPIO_WritePin(STEP_Z_GPIO_Port, STEP_Z_Pin , GPIO_PIN_SET);
 
     while(1) {
         if (isAborted) {

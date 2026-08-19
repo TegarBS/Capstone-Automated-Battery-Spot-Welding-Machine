@@ -8,86 +8,118 @@
 #include "FungsiEEPROM.h"
 #include "GlobalData.h"
 #include <string.h>
+#include "UtilitasDanPerhitungan.h"
 
 uint16_t eeprom=0;
 
-#define FLASH_EEPROM_ADDR 0x08020000 // Alamat awal Sektor 5 di STM32F401
+extern I2C_HandleTypeDef hi2c1;
+extern IWDG_HandleTypeDef hiwdg;
+
+// Alamat default AT24C256 (A0, A1, A2 terhubung ke GND)
+// STM32 menggunakan format 8-bit, jadi 0x50 digeser 1 bit kiri menjadi 0xA0
+#define EEPROM_I2C_ADDR 0xA0
+
+// Kavling Memori
+#define ADDR_ODOMETER   0x0000  // Mulai dari byte 0
+#define ADDR_SETTINGS   0x0020  // Mulai dari byte 32
+
 #define MAGIC_NUMBER 0xABCD1234      // Kode rahasia penanda Flash valid
 
-// --- FUNGSI MEMBACA DARI FLASH ---
-void Load_Settings_From_Flash(void) {
-    // Arahkan pointer untuk membaca langsung dari alamat Flash hardware
-    const PermanentSettings_t *flashData = (const PermanentSettings_t*)FLASH_EEPROM_ADDR;
 
-    if (flashData->magicNumber == MAGIC_NUMBER) {
-        // Jika kode cocok, copy isi Flash ke RAM
-        eepromSettings = *flashData;
-    } else {
-        // Jika Flash masih kosong / pabrikan, beri nilai Default!
-    	Load_Default_Value();
+void Task_Storage(void *pvParameters) {
+	vTaskDelay(pdMS_TO_TICKS(100));
+	eeprom++;
+
+    while(1) {
+        // Tidur pulas sampai ada yang menyuruh Save
+        if (xSemaphoreTake(Sem_MintaSave, portMAX_DELAY) == pdTRUE) {
+
+        	eeprom+=100;
+            // Lakukan penulisan 300ms
+            Save_Settings_To_EEPROM();
+            Ambil_Data_Dari_Holding_Register();
+            Update_Motor_Param_From_Settings();
+
+
+            // Jangan lupa reset IWDG di dalam fungsi Save-nya
+        }
     }
-
-    // Salin ke Modbus Holding Registers agar bisa dibaca oleh HMI saat konek pertama kali
-    Salin_Data_Ke_Register();
 }
 
-// --- FUNGSI MENYIMPAN KE FLASH (DENGAN SAFETY INTERLOCK) ---
-bool Save_Settings_To_Flash(void) {
 
-	eeprom++;
+// --- FUNGSI MEMBACA DARI FLASH ---
+void Load_Settings_From_EEPROM(void) {
 
-    // ==========================================================
-    // 1. SAFETY INTERLOCK (PENCEGAHAN CRASH)
-    // Jangan izinkan penyimpanan jika mesin sedang melakukan aktivitas kritis!
-    // ==========================================================
-    if (isAutoWeldActive || isPerformManualJog || isPerformHoming || isNavigating) {
-        return false; // TOLAK PERINTAH! Mesin sedang sibuk
+    uint8_t *pData = (uint8_t*)&eepromSettings;
+    uint16_t ukuran_struct = sizeof(PermanentSettings_t);
+
+    // 1. Tarik semua isi EEPROM sekaligus ke dalam Struct RAM sementara
+    HAL_StatusTypeDef status = HAL_I2C_Mem_Read(
+        &hi2c1, EEPROM_I2C_ADDR,
+        ADDR_SETTINGS, I2C_MEMADD_SIZE_16BIT,
+        pData, ukuran_struct, 1000
+    );
+
+    // 2. Cek apakah komunikasi kabel I2C sukses
+    if (status != HAL_OK) {
+        // Gagal membaca (kabel putus atau IC rusak)
+        Load_Default_Value(); // Isi dengan default pabrik agar tidak HardFault
+        Salin_Data_Ke_Register();
+        return;
     }
-    eeprom++;
 
+    // 3. CEK MAGIC NUMBER (Apakah EEPROM masih kosong/baru dari toko?)
+    // IC EEPROM baru dari pabrik biasanya berisi 0xFF di seluruh byte-nya.
+    if (eepromSettings.magicNumber == MAGIC_NUMBER) {
+        // DATA VALID! Magic Number cocok.
+        // Data sudah otomatis masuk ke struct eepromSettings melalui pointer pData
+    } else {
+    	eeprom+=10;
+        Load_Default_Value();
+    }
 
-	if (motorX.isMoving() || motorY.isMoving() || motorZ.isMoving()) {
-		return false; // TOLAK PERINTAH! Motor sedang berputar
-	}
-	eeprom++;
+    // 4. Sinkronisasi data ke HMI
+    Salin_Data_Ke_Register();
 
-    // 2. Ambil data terbaru dari Holding Registers HMI
+    return;
+}
+
+bool Save_Settings_To_EEPROM(void) {
+    // 1. Safety Interlock
+    if (isAutoWeldActive || isPerformManualJog || motorX.isMoving()) {
+        return false; // Mesin sedang sibuk
+    }
+
+    // 2. Ambil data terbaru dari HMI
     Ambil_Data_Dari_Holding_Register();
-    eeprom++;
 
-    // 3. MATIKAN SELURUH AKTIVITAS HARDWARE (GLOBAL DISABLE)
-    __disable_irq();
+    // 3. Konversi struct menjadi deretan byte (array)
+    uint8_t *pData = (uint8_t*)&eepromSettings;
+    uint16_t ukuran_struct = sizeof(PermanentSettings_t);
 
-    // 4. Buka gembok Flash STM32
-    HAL_FLASH_Unlock();
+    // 4. Tulis Byte per Byte secara aman
+    for (uint16_t i = 0; i < ukuran_struct; i++) {
 
-    // 5. Hapus Sektor 5 (Wajib sebelum menulis)
-    FLASH_EraseInitTypeDef EraseInitStruct;
-    uint32_t SectorError = 0;
-    EraseInitStruct.TypeErase = FLASH_TYPEERASE_SECTORS;
-    EraseInitStruct.VoltageRange = FLASH_VOLTAGE_RANGE_3;
-    EraseInitStruct.Sector = FLASH_SECTOR_5;
-    EraseInitStruct.NbSectors = 1;
-    HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError);
+        // Parameter: Handle I2C, Alamat IC, Alamat Memori Internal (16-BIT!), Ukuran Alamat, Data, Panjang, Timeout
+        HAL_StatusTypeDef status = HAL_I2C_Mem_Write(
+            &hi2c1, EEPROM_I2C_ADDR,
+            ADDR_SETTINGS + i, I2C_MEMADD_SIZE_16BIT,
+            &pData[i], 1, 100
+        );
 
-    // 6. Tulis ulang data Struct ke Flash (Kata per Kata / 32-bit)
-    const uint32_t *pRamData = reinterpret_cast<const uint32_t*>(&eepromSettings);
-    uint32_t wordsToWrite = sizeof(PermanentSettings_t) / 4;
-    if (sizeof(PermanentSettings_t) % 4 != 0) wordsToWrite++;
+        if (status != HAL_OK) {
+            return false; // Terjadi error pada kabel I2C
+        }
 
-    for (uint32_t i = 0; i < wordsToWrite; i++) {
-        HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, FLASH_EEPROM_ADDR + (i * 4), pRamData[i]);
+        // IC EEPROM butuh waktu fisik maksimal 5ms untuk "memanggang" 1 byte data
+        vTaskDelay(pdMS_TO_TICKS(5));
+
+        // Beri napas buatan pada Watchdog yang ketat (150ms)
+        //heartbeat_Sequencer = true;
+        // Jika pakai HAL IWDG langsung: HAL_IWDG_Refresh(&hiwdg);
     }
 
-    // 7. Kunci kembali Flash
-    HAL_FLASH_Lock();
-
-    // 8. NYALAKAN KEMBALI SELURUH AKTIVITAS HARDWARE
-    __enable_irq();
-
-
-    eeprom++;
-    return true; // Penyimpanan Berhasil
+    return true; // Sukses menyimpan tanpa mereset mesin!
 }
 
 void Salin_Data_Ke_Register(void){
@@ -99,7 +131,6 @@ void Salin_Data_Ke_Register(void){
 void Ambil_Data_Dari_Holding_Register(void){
 	eepromSettings.magicNumber = MAGIC_NUMBER;
 
-	// Kopi 26 parameter sekaligus dari Array HMI masuk ke RAM mesin
 	memcpy(&eepromSettings.stepsPerMmX,
 		   &Holding_Registers[EEPROM_START_MODBUS_REG],
 		   TOTAL_EEPROM_PARAMS * sizeof(uint16_t));

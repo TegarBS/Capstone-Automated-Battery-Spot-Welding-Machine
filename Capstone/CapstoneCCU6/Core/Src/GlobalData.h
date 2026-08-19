@@ -21,7 +21,7 @@
 #define EEPROM_START_MODBUS_REG 20
 #define TOTAL_EEPROM_PARAMS 30
 
-#define SKALA_FLOAT 100.0f
+//#define SKALA_FLOAT 100.0f
 
 
 extern volatile uint16_t errorCallback;
@@ -138,6 +138,7 @@ extern volatile bool isPerformWeld;
 // =========================================================
 extern SemaphoreHandle_t SinyalPosisiTercapai;
 extern SemaphoreHandle_t Sem_DataDiterima;
+extern SemaphoreHandle_t Sem_MintaSave;
 
 // =========================================================
 // [Modbus Communication]

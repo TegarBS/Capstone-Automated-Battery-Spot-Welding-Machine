@@ -56,11 +56,11 @@ bool StepperMotor::isMoving(void) {
 	return isMoving_flag;
 }
 
-void StepperMotor::setMaxPositionLimitPulse(long maxPulse) {
+void StepperMotor::setMaxPositionLimitPulse(int32_t maxPulse) {
     maxPositionLimitPulse = maxPulse;
 }
 
-void StepperMotor::setTargetPulse(long target) {
+void StepperMotor::setTargetPulse(int32_t target) {
 
     // =====================================================
 	// 1. CEK SOFT LIMIT (Kunci target agar tidak menabrak)
@@ -156,9 +156,9 @@ void StepperMotor::isr_update(void) {
     if (!isMoving_flag) return;
 
     // 1. Tembakkan Pulsa STEP
-    HAL_GPIO_WritePin(stepPort, stepPin, GPIO_PIN_SET);
-    for(volatile int i = 0; i < 100; i++) {} // Delay aman ~5 microsecond
     HAL_GPIO_WritePin(stepPort, stepPin, GPIO_PIN_RESET);
+    for(volatile int i = 0; i < 100; i++) {} // Delay aman ~5 microsecond
+    HAL_GPIO_WritePin(stepPort, stepPin, GPIO_PIN_SET);
 
     // 2. Update Koordinat
     if (targetPositionPulse > currentPositionPulse) currentPositionPulse++;
@@ -211,6 +211,6 @@ void StepperMotor::resetPosition(void) {
     state = IDLE_STATE;
 }
 
-long StepperMotor::getCurrentPositionPulse(void) {
+int32_t StepperMotor::getCurrentPositionPulse(void) {
     return currentPositionPulse;
 }

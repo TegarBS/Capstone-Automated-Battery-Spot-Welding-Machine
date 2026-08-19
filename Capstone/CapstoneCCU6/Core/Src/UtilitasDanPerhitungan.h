@@ -20,21 +20,21 @@ Koordinat_t Calculate_Battery_Center_mm(void);
  * @param target_mm Jarak yang diinginkan dalam milimeter (bisa bernilai negatif)
  * @return Jumlah pulsa absolut (32-bit signed integer)
  */
-long Convert_mm_to_PulseX(float target_mm);
+int32_t Convert_mm_to_PulseX(float target_mm);
 
 /**
  * Mengonversi jarak milimeter (Sumbu Y) menjadi jumlah pulsa motor
  * @param target_mm Jarak yang diinginkan dalam milimeter (bisa bernilai negatif)
  * @return Jumlah pulsa absolut (32-bit signed integer)
  */
-long Convert_mm_to_PulseY(float target_mm);
+int32_t Convert_mm_to_PulseY(float target_mm);
 
 /**
  * Mengonversi jarak milimeter (Sumbu Y) menjadi jumlah pulsa motor
  * @param target_mm Jarak yang diinginkan dalam milimeter (bisa bernilai negatif)
  * @return Jumlah pulsa absolut (32-bit signed integer)
  */
-long Convert_mm_to_PulseZ(float target_mm);
+int32_t Convert_mm_to_PulseZ(float target_mm);
 
 void Update_Motor_Param_From_Settings(void);
 void Update_Motor_Param_Homing_From_Settings(void);

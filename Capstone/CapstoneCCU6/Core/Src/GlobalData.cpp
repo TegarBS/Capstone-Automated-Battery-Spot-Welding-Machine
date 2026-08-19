@@ -58,6 +58,7 @@ volatile bool isPerformWeld = false;
 // =========================================================
 SemaphoreHandle_t SinyalPosisiTercapai;
 SemaphoreHandle_t Sem_DataDiterima;
+SemaphoreHandle_t Sem_MintaSave;
 
 // =========================================================
 // [Modbus Communication]

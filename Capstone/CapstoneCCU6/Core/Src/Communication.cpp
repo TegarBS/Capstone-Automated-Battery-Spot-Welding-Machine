@@ -18,10 +18,12 @@ uint8_t txBuffer[256];
 
 // --- Konstanta Modbus ---
 const uint16_t MODBUS_COIL_ON = 0xFF00;
-const uint8_t  MODBUS_EXCEPTION_ILLEGAL_FUNCTION   = 0x01;
-const uint8_t  MODBUS_EXCEPTION_ILLEGAL_ADDRESS    = 0x02;
-const uint8_t  MODBUS_EXCEPTION_ILLEGAL_DATA_VALUE = 0x03;
-const uint8_t  MODBUS_EXCEPTION_BUSY               = 0x06;
+const uint8_t  MODBUS_EXCEPTION_ILLEGAL_FUNCTION   	= 0x01;
+const uint8_t  MODBUS_EXCEPTION_ILLEGAL_ADDRESS    	= 0x02;
+const uint8_t  MODBUS_EXCEPTION_ILLEGAL_DATA_VALUE 	= 0x03;
+const uint8_t  MODBUS_EXCEPTION_DEVICE_FAILURE 		= 0x04;
+
+const uint8_t  MODBUS_EXCEPTION_BUSY               	= 0x06;
 
 // --- Daftar Alamat Coil ---
 enum ModbusCoilAddress {
@@ -154,10 +156,12 @@ extern "C" void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 
         // Trik Sederhana Modbus RTU Purwarupa:
         // Perintah 0x05 dan 0x06 Modbus panjangnya SELALU tepat 8 Byte!
-        if (rxIndex >= 8) {
-            BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-            xSemaphoreGiveFromISR(Sem_DataDiterima, &xHigherPriorityTaskWoken);
-            portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+        if (rxIndex == 8) {
+        	if (Sem_DataDiterima != NULL) {
+				BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+				xSemaphoreGiveFromISR(Sem_DataDiterima, &xHigherPriorityTaskWoken);
+				portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+			}
         }
 
 
@@ -499,8 +503,9 @@ void Function_Code_05_WRITE_SINGLE_COIL(uint8_t* rxBufferInput, uint8_t len) {
                     break;             // Langsung lompat keluar dari blok case ini
                 }
 
-                isAutoWeldActive = true;
                 isFirstWeldCycle = true;
+                isAutoWeldActive = true;
+
 
             }
             break;
@@ -540,10 +545,12 @@ void Function_Code_05_WRITE_SINGLE_COIL(uint8_t* rxBufferInput, uint8_t len) {
 
         case COIL_SAVE_TO_FLASH:
             if (coil_val == MODBUS_COIL_ON) {
-                if (!Save_Settings_To_Flash()) {
-                    Send_Modbus_Exception(rxBufferInput[0], 0x05, MODBUS_EXCEPTION_BUSY);
-                    send_echo = false;
-                }
+            	if (isPerformHoming || isAutoWeldActive || isPerformWeld || isPerformManualJog){
+            		Send_Modbus_Exception(rxBufferInput[0], 0x05, MODBUS_EXCEPTION_BUSY);
+    				send_echo = false; // Batal kirim ACK
+    				break;             // Langsung lompat keluar dari blok case ini
+            	}
+            	xSemaphoreGive(Sem_MintaSave);
             }
             break;
 
@@ -669,16 +676,6 @@ void Function_Code_06_WRITE_SINGLE_REGISTER(uint8_t* rxBufferInput, uint8_t len)
 
         // Simpan data mentah ke Holding Register (Aman, karena sudah terkurasi)
         Holding_Registers[alamat_offset] = data_baru;
-
-        // Jika yang diubah adalah parameter mekanik, update objek motor
-        if (alamat_offset >= 20) {
-        	Ambil_Data_Dari_Holding_Register();
-        	vTaskDelay(pdMS_TO_TICKS(2));
-            Update_Motor_Param_From_Settings();
-        }
-
-        // Kirim Balasan Sukses (ACK)
-        // Di FC06, balasan sukses adalah mengirim ulang pesan request (Echo)
 
         vTaskDelay(pdMS_TO_TICKS(5));
         HAL_UART_Transmit_DMA(&huart1, rxBufferInput, len);

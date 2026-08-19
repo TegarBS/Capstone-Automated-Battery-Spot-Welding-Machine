@@ -19,16 +19,16 @@ private:
     uint16_t dirPin;
     TIM_HandleTypeDef* htim; // Pointer ke Hardware Timer (TIM2 / TIM3)
 
-    long currentPositionPulse;
-    long targetPositionPulse;
-    bool invertDir;
+    int32_t currentPositionPulse;
+    int32_t targetPositionPulse;
+    int32_t invertDir;
 
     uint32_t timerClock; // Kecepatan clock timer
 
     // --- Variabel Dynamic ARR (Akselerasi Trapesium) ---
     MotionState state;
-    long stepsToGo;
-    long accelSteps;
+    int32_t stepsToGo;
+    int32_t accelSteps;
 
     // --- Variabel Pergerakan ---
     float minSpeedHz;       // Frekuensi awal saat motor mulai bergerak
@@ -40,7 +40,7 @@ private:
 
     bool isMoving_flag;
 
-    long maxPositionLimitPulse;
+    int32_t maxPositionLimitPulse;
 
 
 public:

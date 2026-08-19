@@ -15,6 +15,11 @@
  */
 void Task_Monitor(void *pvParameters) {
 
+	for(uint32_t t = 0; t < 1000; t += 10) {
+		vTaskDelay(pdMS_TO_TICKS(10));
+		HAL_IWDG_Refresh(&hiwdg);
+	}
+
 	uint32_t counter_led = 0;
 
     while(1) {
@@ -40,17 +45,20 @@ void Task_Monitor(void *pvParameters) {
 		}
 
         // --- 1. UPDATE REGISTER MODBUS (MONITORING POSISI) ---
-		long currentX_pulse = motorX.getCurrentPositionPulse();
-		long currentY_pulse = motorY.getCurrentPositionPulse();
-		long currentZ_pulse = motorZ.getCurrentPositionPulse();
+		int32_t currentX_pulse = motorX.getCurrentPositionPulse();
+		int32_t currentY_pulse = motorY.getCurrentPositionPulse();
+		int32_t currentZ_pulse = motorZ.getCurrentPositionPulse();
 
 		// KONVERSI KE MILIMETER DENGAN PRESISI x100
 		// Rumus: (Pulse * 100) / Steps_per_mm
-		long currentX_mm = (currentX_pulse * 100) / eepromSettings.stepsPerMmX;
-		long currentY_mm = (currentY_pulse * 100) / eepromSettings.stepsPerMmY;
-		long currentZ_mm = (currentZ_pulse * 100) / eepromSettings.stepsPerMmZ;
+		// Jika stepsPerMm bernilai 0, langsung jadikan hasilnya 0.
+		// Jika tidak 0, baru lakukan operasi pembagian.
 
-		// Pecah 32-bit (long) menjadi 2 bagian 16-bit untuk Input Register Modbus
+		int32_t currentX_mm = (eepromSettings.stepsPerMmX == 0) ? 0 : ((currentX_pulse * 100) / eepromSettings.stepsPerMmX);
+		int32_t currentY_mm = (eepromSettings.stepsPerMmY == 0) ? 0 : ((currentY_pulse * 100) / eepromSettings.stepsPerMmY);
+		int32_t currentZ_mm = (eepromSettings.stepsPerMmZ == 0) ? 0 : ((currentZ_pulse * 100) / eepromSettings.stepsPerMmZ);
+
+		// Pecah 32-bit (int32_t) menjadi 2 bagian 16-bit untuk Input Register Modbus
 		Input_Registers[0] = currentX_mm & 0xFFFF;
 		Input_Registers[1] = (currentX_mm >> 16) & 0xFFFF;
 		Input_Registers[2] = currentY_mm & 0xFFFF;

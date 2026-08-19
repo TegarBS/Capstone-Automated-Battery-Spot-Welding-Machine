@@ -35,14 +35,14 @@ Koordinat_t Calculate_Battery_Center_mm(void) {
  * @param target_mm Jarak yang diinginkan dalam milimeter (bisa bernilai negatif)
  * @return Jumlah pulsa absolut (32-bit signed integer)
  */
-long Convert_mm_to_PulseX(float target_mm) {
+int32_t Convert_mm_to_PulseX(float target_mm) {
     // Trik CNC: Tambahkan 0.5f untuk pembulatan (rounding) ke nearest integer.
     // Jika tidak, angka 10.9 step akan dipotong (truncate) menjadi 10 step oleh C++.
     if (target_mm >= 0) {
-        return (long)(target_mm * eepromSettings.stepsPerMmX + 0.5f);
+        return (int32_t)(target_mm * eepromSettings.stepsPerMmX + 0.5f);
     } else {
         // Untuk pergerakan mundur (negatif)
-        return (long)(target_mm * eepromSettings.stepsPerMmX - 0.5f);
+        return (int32_t)(target_mm * eepromSettings.stepsPerMmX - 0.5f);
     }
 }
 
@@ -51,11 +51,11 @@ long Convert_mm_to_PulseX(float target_mm) {
  * @param target_mm Jarak yang diinginkan dalam milimeter (bisa bernilai negatif)
  * @return Jumlah pulsa absolut (32-bit signed integer)
  */
-long Convert_mm_to_PulseY(float target_mm) {
+int32_t Convert_mm_to_PulseY(float target_mm) {
     if (target_mm >= 0) {
-        return (long)(target_mm * eepromSettings.stepsPerMmY + 0.5f);
+        return (int32_t)(target_mm * eepromSettings.stepsPerMmY + 0.5f);
     } else {
-        return (long)(target_mm * eepromSettings.stepsPerMmY - 0.5f);
+        return (int32_t)(target_mm * eepromSettings.stepsPerMmY - 0.5f);
     }
 }
 
@@ -64,11 +64,11 @@ long Convert_mm_to_PulseY(float target_mm) {
  * @param target_mm Jarak yang diinginkan dalam milimeter (bisa bernilai negatif)
  * @return Jumlah pulsa absolut (32-bit signed integer)
  */
-long Convert_mm_to_PulseZ(float target_mm) {
+int32_t Convert_mm_to_PulseZ(float target_mm) {
     if (target_mm >= 0) {
-        return (long)(target_mm * eepromSettings.stepsPerMmZ + 0.5f);
+        return (int32_t)(target_mm * eepromSettings.stepsPerMmZ + 0.5f);
     } else {
-        return (long)(target_mm * eepromSettings.stepsPerMmZ - 0.5f);
+        return (int32_t)(target_mm * eepromSettings.stepsPerMmZ - 0.5f);
     }
 }
 
@@ -115,9 +115,9 @@ void Update_Motor_Param_From_Settings(void) {
 	motorZ.setInvertDirection(eepromSettings.directionZ != 0);
 
 	// Konversi milimeter ke Pulse, lalu suntikkan ke Motor
-	long batasPulseX = Convert_mm_to_PulseX(eepromSettings.maxTravelX);
-	long batasPulseY = Convert_mm_to_PulseY(eepromSettings.maxTravelY);
-	long batasPulseZ = Convert_mm_to_PulseZ(eepromSettings.maxTravelZ);
+	int32_t batasPulseX = Convert_mm_to_PulseX(eepromSettings.maxTravelX);
+	int32_t batasPulseY = Convert_mm_to_PulseY(eepromSettings.maxTravelY);
+	int32_t batasPulseZ = Convert_mm_to_PulseZ(eepromSettings.maxTravelZ);
 
 	motorX.setMaxPositionLimitPulse(batasPulseX);
 	motorY.setMaxPositionLimitPulse(batasPulseY);
