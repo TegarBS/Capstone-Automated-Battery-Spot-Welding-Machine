@@ -19,7 +19,7 @@
 #define TOTAL_DISCRETE_INPUT 10
 
 #define EEPROM_START_MODBUS_REG 20
-#define TOTAL_EEPROM_PARAMS 30
+#define TOTAL_EEPROM_PARAMS 32
 
 //#define SKALA_FLOAT 100.0f
 
@@ -76,7 +76,10 @@ typedef struct __attribute__((aligned(4))){
     uint16_t Y_distance_from_0;
 
     uint16_t time_out_pneumatic_ms;
-    uint16_t weld_time;
+
+    uint16_t pre_heat_time_ms;
+    uint16_t interval_time_ms;
+    uint16_t main_pulse_weld_time;
 
 } PermanentSettings_t;
 
@@ -139,6 +142,7 @@ extern volatile bool isPerformWeld;
 extern SemaphoreHandle_t SinyalPosisiTercapai;
 extern SemaphoreHandle_t Sem_DataDiterima;
 extern SemaphoreHandle_t Sem_MintaSave;
+extern SemaphoreHandle_t Sem_WeldDone;
 
 // =========================================================
 // [Modbus Communication]
@@ -166,6 +170,7 @@ extern UART_HandleTypeDef huart1;
 extern TIM_HandleTypeDef htim2;
 extern TIM_HandleTypeDef htim3;
 extern TIM_HandleTypeDef htim4;
+extern TIM_HandleTypeDef htim5;
 
 extern IWDG_HandleTypeDef hiwdg;
 

@@ -25,6 +25,23 @@ extern "C" void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
         // Catatan: Semaphore akan otomatis dilepas di blok evaluasi di bawah
     }
 
+    if (htim->Instance == TIM5) {
+
+		// 1. MATIKAN API LAS SECARA INSTAN! (Presisi 1 mikrodetik)
+		HAL_GPIO_WritePin(WELD_PIN_GPIO_Port, WELD_PIN_Pin, GPIO_PIN_RESET);
+
+		// Karena kita pakai One-Pulse Mode, Timer otomatis berhenti.
+		// Namun demi keamanan ganda, kita stop juga interupsinya.
+		HAL_TIM_Base_Stop_IT(&htim5);
+
+		// 2. Beri tahu RTOS bahwa tugas hardware sudah selesai dengan selamat
+		if (Sem_WeldDone != NULL) {
+			BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+			xSemaphoreGiveFromISR(Sem_WeldDone, &xHigherPriorityTaskWoken);
+			portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+		}
+	}
+
     // 2. EKSEKUSI PULSA MOTOR X (Hanya jika tidak di-Pause)
     if (htim->Instance == TIM2) {
         if (!isPaused) motorX.isr_update();

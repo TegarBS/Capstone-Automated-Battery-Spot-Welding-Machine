@@ -59,11 +59,12 @@ volatile bool isPerformWeld = false;
 SemaphoreHandle_t SinyalPosisiTercapai;
 SemaphoreHandle_t Sem_DataDiterima;
 SemaphoreHandle_t Sem_MintaSave;
+SemaphoreHandle_t Sem_WeldDone;
 
 // =========================================================
 // [Modbus Communication]
 // =========================================================
-uint16_t Holding_Registers[TOTAL_HOLDING_REGISTERS]	 = {0}; // Alamat 40001
+uint16_t Holding_Registers[TOTAL_HOLDING_REGISTERS]	 = {0};
 uint16_t Input_Registers[TOTAL_INPUT_REGISTER]  	 = {0};
 uint8_t Coils[TOTAL_COILS]              		     = {0};
 uint8_t Discrete_Input[TOTAL_DISCRETE_INPUT]  	     = {0};
@@ -84,5 +85,7 @@ uint16_t indexBarisAktual = 0;
 // =========================================================
 volatile bool heartbeat_Sequencer = false;
 volatile bool heartbeat_Komunikasi = false;
+
+
 
 

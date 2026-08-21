@@ -91,10 +91,10 @@ void Error_Handler(void);
 #define DIR_Z_GPIO_Port GPIOB
 #define STEP_Z_Pin GPIO_PIN_4
 #define STEP_Z_GPIO_Port GPIOB
-#define WELD_EN_Pin GPIO_PIN_5
-#define WELD_EN_GPIO_Port GPIOB
-#define WELD_PULSE_Pin GPIO_PIN_6
-#define WELD_PULSE_GPIO_Port GPIOB
+#define ENABLE_PIN_Pin GPIO_PIN_5
+#define ENABLE_PIN_GPIO_Port GPIOB
+#define WELD_PIN_Pin GPIO_PIN_6
+#define WELD_PIN_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 

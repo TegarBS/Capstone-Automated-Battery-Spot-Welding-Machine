@@ -75,6 +75,29 @@ enum ModbusHoldingRegister {
 
 };
 
+enum ErrorCode{
+	NORMAL			= 0,
+
+	EEPROM_ERROR 	= 101,
+	I2C_ERROR		= 102,
+
+	LIMIT_X			= 201,
+	LIMIT_Y			= 202,
+	LIMIT_Z			= 203,
+	LIMIT_PU		= 204,
+	HOMING_TIMEOUT	= 205,
+	OUT_OF_BOUNDS	= 206,
+
+	PU_TIMEOUT		= 301,
+	WELD_MISFIRE	= 302,
+	OVERHEAT		= 303,
+	LOW_AIR_PRESSURE	= 304,
+
+	E_STOP			= 401,
+	SAFETY_DOOR_OPEN	= 402,
+
+};
+
 // =========================================================
 // TASK KOMUNIKASI (PARSER MODBUS RTU ZERO-QUEUE)
 // =========================================================
@@ -87,6 +110,28 @@ void Task_Komunikasi(void *pvParameters) {
 
     while(1) {
         if (xSemaphoreTake(Sem_DataDiterima, pdMS_TO_TICKS(50)) == pdTRUE) {
+
+        	// ----------------------------------------------------
+			// CEK APAKAH INI KEBANGUN KARENA ERROR?
+			// (Jika rxIndex = 0, berarti dibangunkan oleh ErrorCallback)
+			// ----------------------------------------------------
+			if (rxIndex == 0) {
+				// Jeda 15 milidetik (Biarkan gelombang data HMI lewat dulu)
+				HAL_UART_DeInit(&huart1);
+
+				Delay_With_Watchdog(100, heartbeat_Komunikasi);
+
+				HAL_UART_Init(&huart1);
+				// Pastikan tidak ada "sinyal hantu" yang menumpuk di antrean RTOS
+				xSemaphoreTake(Sem_DataDiterima, 0);
+
+				// 4. Pasang telinga lagi dengan kondisi hardware yang 100% SUCI dan BERSIH
+				HAL_UART_Receive_IT(&huart1, &rxChar, 1);
+
+				errorCallback++;
+
+				continue; // Lompat ke atas while(1)
+			}
 
             uint8_t len = rxIndex;
             rxIndex = 0; // Reset untuk paket berikutnya
@@ -141,11 +186,8 @@ void Task_Komunikasi(void *pvParameters) {
 // =========================================================
 // CALLBACK INTERUPSI UART (HARDWARE ISR)
 // =========================================================
-// cppcheck-suppress constParameterPointer
 extern "C" void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
     if (huart->Instance == USART1) {
-
-
 
         rxBuffer[rxIndex++] = rxChar;
 
@@ -154,8 +196,6 @@ extern "C" void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
             rxIndex = 0;
         }
 
-        // Trik Sederhana Modbus RTU Purwarupa:
-        // Perintah 0x05 dan 0x06 Modbus panjangnya SELALU tepat 8 Byte!
         if (rxIndex == 8) {
         	if (Sem_DataDiterima != NULL) {
 				BaseType_t xHigherPriorityTaskWoken = pdFALSE;
@@ -164,8 +204,6 @@ extern "C" void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 			}
         }
 
-
-        // Pancing interupsi berikutnya
         HAL_UART_Receive_IT(&huart1, &rxChar, 1);
     }
 }
@@ -174,37 +212,37 @@ extern "C" void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 // CALLBACK JIKA TERJADI ERROR KOMUNIKASI (OVERRUN, NOISE, FRAMING)
 // =================================================================
 extern "C" void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
-    if (huart->Instance == USART1) { // Sesuaikan dengan USART yang Anda pakai
+    if (huart->Instance == USART1) {
 
-    	rxIndex = 0;
+        // 1. Matikan interupsi seketika agar CPU tidak dibombardir
+        HAL_UART_AbortReceive(huart);
 
-    	HAL_UART_AbortReceive(huart);
-        // 1. Bersihkan bendera error secara manual (Opsional tapi disarankan)
-        __HAL_UART_CLEAR_OREFLAG(huart);
-        __HAL_UART_CLEAR_FEFLAG(huart);
-        __HAL_UART_CLEAR_NEFLAG(huart);
-        __HAL_UART_CLEAR_PEFLAG(huart);
+        // 2. Pembersihan Flag Anti-Gagal (Cara paling ampuh untuk STM32F4)
+        volatile uint32_t tmp1 = huart->Instance->SR;
+        volatile uint32_t tmp2 = huart->Instance->DR;
+        (void)tmp1; (void)tmp2;
 
-        // 2. PAKSA STM32 UNTUK MENDENGARKAN KEMBALI!
-        // Tanpa baris ini, STM32 akan "tuli" selamanya setelah terkena noise.
-
+        rxIndex = 0;
         errorCallback++;
 
-        HAL_UART_Receive_IT(&huart1, &rxChar, 1);
+        // 3. BANGUNKAN TASK KOMUNIKASI (Beritahu ada error)
+        // Kita JANGAN memanggil HAL_UART_Receive_IT di sini!
+        if (Sem_DataDiterima != NULL) {
+            BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+            xSemaphoreGiveFromISR(Sem_DataDiterima, &xHigherPriorityTaskWoken);
+            portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+        }
     }
 }
-
 // ========================================================
-// 3. CALLBACK SAAT TRANSMISI SELESAI PENGIRIMAN
+// CALLBACK SAAT TRANSMISI SELESAI PENGIRIMAN
 // ========================================================
 // Fungsi ini otomatis dipanggil oleh hardware saat byte terakhir keluar dari kabel
 extern "C" void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart) {
     if (huart->Instance == USART1) {
 
-        // PENTING: Reset index penerima ke 0
         rxIndex = 0;
 
-        // Buka telinga lagi untuk mendengarkan HMI
         HAL_UART_Receive_IT(&huart1, &rxChar, 1);
     }
 }
@@ -224,8 +262,6 @@ void Function_Code_01_READ_COILS(uint8_t* rxBufferInput, uint8_t len) {
 			return;
 		}
 
-//        uint8_t txBuffer[256];
-
         // 3. Hitung Jumlah Byte Data
         // Rumus membagi 8 dengan pembulatan ke atas (ceiling)
         uint8_t byte_count = (quantity + 7) / 8;
@@ -235,7 +271,7 @@ void Function_Code_01_READ_COILS(uint8_t* rxBufferInput, uint8_t len) {
         txBuffer[1] = 0x01;             // Function Code: 01 (Read Coils)
         txBuffer[2] = byte_count;       // Jumlah Byte Data
 
-        // 5. Kosongkan (Nol-kan) area data sebelum diisi (Sangat Penting!)
+        // 5. Kosongkan (Nol-kan) area data sebelum diisi
         for (uint8_t i = 0; i < byte_count; i++) {
             txBuffer[3 + i] = 0x00;
         }
@@ -243,7 +279,6 @@ void Function_Code_01_READ_COILS(uint8_t* rxBufferInput, uint8_t len) {
         // 6. Loop sebanyak kuantitas coil dan Lakukan "BIT PACKING"
         for (uint16_t i = 0; i < quantity; i++) {
 
-            // Panggil fungsi Router yang sudah kita buat sebelumnya
             bool coil_status = Baca_Status_Coil(start_addr + i);
 
             if (coil_status == true) {
@@ -266,7 +301,6 @@ void Function_Code_01_READ_COILS(uint8_t* rxBufferInput, uint8_t len) {
         HAL_UART_Transmit_DMA(&huart1, txBuffer, 5 + byte_count);
 
     } else {
-        // HMI meminta alamat di luar batas (Misal minta Coil ke-99)
         Send_Modbus_Exception(rxBufferInput[0], 0x01, MODBUS_EXCEPTION_ILLEGAL_ADDRESS);
     }
 }
@@ -274,10 +308,10 @@ void Function_Code_01_READ_COILS(uint8_t* rxBufferInput, uint8_t len) {
 bool Baca_Status_Coil(uint16_t coil_addr) {
     switch (coil_addr) {
         case COIL_START_AUTO_WELD:
-            return isAutoWeldActive;   // Variabel global dari FSM Anda
+            return isAutoWeldActive;
 
         case COIL_EMERGENCY_STOP:
-            return isAborted;          // Variabel E-Stop
+            return isAborted;
 
         case COIL_REQUEST_HOMING:
             return isPerformHoming;
@@ -292,7 +326,7 @@ bool Baca_Status_Coil(uint16_t coil_addr) {
         	return isPerformWeld;
 
         default:
-            return false; // Alamat tidak valid
+            return false;
     }
 }
 
@@ -310,8 +344,6 @@ void Function_Code_02_READ_DISCRETE_INPUT(uint8_t* rxBufferInput, uint8_t len) {
     	if (huart1.gState != HAL_UART_STATE_READY) {
 			return;
 		}
-
-//        uint8_t txBuffer[256];
 
         // 3. Hitung Jumlah Byte Data (Pembulatan ke atas)
         uint8_t byte_count = (quantity + 7) / 8;
@@ -400,9 +432,6 @@ void Function_Code_03_READ_HOLDING_REGISTER(uint8_t* rxBufferInput, uint8_t len)
 			return;
 		}
 
-        // Modbus bisa meminta hingga 125 register (250 byte),
-        // pastikan buffer cukup besar (maks standar Modbus RTU adalah 256 byte)
-//        uint8_t txBuffer[256];
         uint8_t byte_count = quantity * 2;
 
         txBuffer[0] = rxBufferInput[0]; // Slave ID
@@ -427,13 +456,12 @@ void Function_Code_03_READ_HOLDING_REGISTER(uint8_t* rxBufferInput, uint8_t len)
         HAL_UART_Transmit_DMA(&huart1, txBuffer, 5 + byte_count);
 
     } else {
-        // Alamat melebihi batas, kirim Exception 0x02 (Illegal Data Address)
         Send_Modbus_Exception(rxBufferInput[0], 0x03, MODBUS_EXCEPTION_ILLEGAL_ADDRESS);
     }
 }
 
 // -----------------------------------------------------
-// FUNC 0x04: READ INPUT REGISTERS (Monitor Posisi X & Y)
+// FUNC 0x04: READ INPUT REGISTERS
 // -----------------------------------------------------
 void Function_Code_04_READ_INPUT_REGISTER(uint8_t* rxBufferInput, uint8_t len) {
     uint16_t start_addr = (rxBufferInput[2] << 8) | rxBufferInput[3];
@@ -446,7 +474,6 @@ void Function_Code_04_READ_INPUT_REGISTER(uint8_t* rxBufferInput, uint8_t len) {
 			return;
 		}
 
-//        uint8_t txBuffer[32];
         uint8_t byte_count = quantity * 2;
 
         txBuffer[0] = rxBufferInput[0]; // Slave ID
@@ -464,8 +491,8 @@ void Function_Code_04_READ_INPUT_REGISTER(uint8_t* rxBufferInput, uint8_t len) {
 
         vTaskDelay(pdMS_TO_TICKS(5));
         HAL_UART_Transmit_DMA(&huart1, txBuffer, 5 + byte_count);
+
     } else {
-        // Alamat melebihi batas, kirim Exception 0x02 (Illegal Data Address)
         Send_Modbus_Exception(rxBufferInput[0], 0x04, MODBUS_EXCEPTION_ILLEGAL_ADDRESS);
     }
 }
@@ -477,7 +504,6 @@ void Function_Code_05_WRITE_SINGLE_COIL(uint8_t* rxBufferInput, uint8_t len) {
     uint16_t coil_addr = (rxBufferInput[2] << 8) | rxBufferInput[3];
     uint16_t coil_val  = (rxBufferInput[4] << 8) | rxBufferInput[5];
 
-    // Bendera penentu apakah STM32 akan mengirim balasan sukses (Echo)
     bool send_echo = true;
 
     switch (coil_addr) {
@@ -702,15 +728,13 @@ uint16_t Hitung_CRC16(const uint8_t *nData, uint16_t wLength) {
 }
 
 void Process_System_Reset(uint8_t* rxBufferInput, uint16_t len) {
-    // 1. Echo ke HMI agar tidak Timeout
+
     HAL_UART_Transmit(&huart1, rxBufferInput, len, 100);
 
     tesreset++;
 
-    // 2. Tunggu transmisi UART selesai
     vTaskDelay(pdMS_TO_TICKS(50));
 
-    // 3. Reboot MCU
     NVIC_SystemReset();
 }
 

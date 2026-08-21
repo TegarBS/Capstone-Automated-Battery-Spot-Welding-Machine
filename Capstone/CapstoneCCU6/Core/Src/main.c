@@ -101,6 +101,7 @@ int main(void)
   MX_IWDG_Init();
   MX_USART2_UART_Init();
   MX_I2C1_Init();
+  MX_TIM5_Init();
   /* USER CODE BEGIN 2 */
   MachineApp_Init();
   /* USER CODE END 2 */
@@ -183,6 +184,7 @@ void SystemClock_Config(void)
   * @param  htim : TIM handle
   * @retval None
   */
+
 
 /**
   * @brief  This function is executed in case of error occurrence.
