@@ -65,7 +65,6 @@ void Error_Handler(void);
 #define RELAY_DOWN_GPIO_Port GPIOA
 #define REED_TOP_Pin GPIO_PIN_4
 #define REED_TOP_GPIO_Port GPIOA
-#define REED_TOP_EXTI_IRQn EXTI4_IRQn
 #define REED_BOTTOM_Pin GPIO_PIN_5
 #define REED_BOTTOM_GPIO_Port GPIOA
 #define LIMIT_CYL_Pin GPIO_PIN_6

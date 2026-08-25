@@ -148,7 +148,7 @@ void Handle_Emergency_Abort(void) {
 }
 
 bool Homing_Silinder_Z(void) {
-    uint32_t startTime;
+    uint32_t startTime = 0;
 
     // 1. Perintahkan Silinder Naik
     Silinder_Up();
@@ -185,15 +185,6 @@ void Perform_Homing_Sequence(void) {
 	   Set_Mesin_Error(301);
 	   return;
    }
-//    {
-		// Jika gagal naik (timeout), tahan Task di sini (jangan lanjut Homing XY)
-		// Tunggu operator menekan tombol Reset/Clear Alarm di HMI
-//		while (isAborted) {
-//			vTaskDelay(pdMS_TO_TICKS(100));
-//			heartbeat_Sequencer = true;
-//		}
-//	}
-
 
     // --- TAHAP 1: SEEK ---
     isNavigating = true;
@@ -257,7 +248,9 @@ void Perform_Auto_Weld_Cycle(void) {
 	}
 
     if (indexBarisAktual >= configLas.totalBaris) {
-        isAutoWeldActive = false; return;
+        isAutoWeldActive = false;
+        isSaveOdo = true;
+        return;
     }
 
     while (isPaused && !isAborted) {
@@ -283,14 +276,18 @@ void Perform_Auto_Weld_Cycle(void) {
         if (!Wait_Motors_Reach_Target()) return; // Gagal / Batal
         isNavigating = false;
 
+        mesinOdo.totalJarakXmm+=center.x;
+        mesinOdo.totalJarakYmm+=center.y + offsetY_mm;
+
         isPerformWeld = true;
 
-//		if (!Eksekusi_Las(eepromSettings.main_pulse_weld_time)) {
-//			// TERJADI ERROR PNEUMATIK!
-//			isAborted = true;
-//			return;             // Hentikan seluruh mesin
-//			//Kirim_Pesan_Error_Ke_HMI();   // Beritahu layar Haiwell
-//		}
+		if (!Eksekusi_Las(eepromSettings.main_pulse_weld_time)) {
+			// TERJADI ERROR PNEUMATIK!
+			isAborted = true;
+			return;
+		}
+
+        mesinOdo.totalTitikLas++;
 
         Delay_With_Watchdog(500, heartbeat_Sequencer);
 

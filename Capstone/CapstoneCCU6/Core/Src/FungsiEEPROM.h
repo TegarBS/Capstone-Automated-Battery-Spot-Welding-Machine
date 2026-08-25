@@ -17,4 +17,8 @@ void Load_Default_Value(void);
 void Salin_Data_Ke_Register(void);
 void Ambil_Data_Dari_Holding_Register(void);
 
+bool Load_Odometer_From_EEPROM(void);
+bool Save_Odometer_To_EEPROM(void);
+bool Reset_Odometer_EEPROM(void);
+
 #endif /* SRC_FUNGSIEEPROM_H_ */

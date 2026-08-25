@@ -72,7 +72,12 @@ void Task_Monitor(void *pvParameters) {
 		// Alert ke HMI
 		Holding_Registers[12] = kode_alarm_sistem;
 
-
+		Holding_Registers[70] = mesinOdo.totalTitikLas & 0xFFFF;
+		Holding_Registers[71] = (mesinOdo.totalTitikLas >> 16) & 0xFFFF;
+		Holding_Registers[72] = mesinOdo.totalJarakXmm & 0xFFFF;
+		Holding_Registers[73] = (mesinOdo.totalJarakXmm >> 16) & 0xFFFF;
+		Holding_Registers[74] = mesinOdo.totalJarakYmm & 0xFFFF;
+		Holding_Registers[75] = (mesinOdo.totalJarakYmm >> 16) & 0xFFFF;
 
         // Tidurkan task selama 50 milidetik
         vTaskDelay(pdMS_TO_TICKS(50));

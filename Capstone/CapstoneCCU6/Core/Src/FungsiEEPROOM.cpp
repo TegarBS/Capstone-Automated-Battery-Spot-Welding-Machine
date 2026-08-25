@@ -30,7 +30,6 @@ extern IWDG_HandleTypeDef hiwdg;
 
 #define IC_ADDRESS_SIZE I2C_MEMADD_SIZE_16BIT
 
-
 void Task_Storage(void *pvParameters) {
 	vTaskDelay(pdMS_TO_TICKS(100));
 
@@ -57,6 +56,11 @@ void Task_Storage(void *pvParameters) {
 
 	isConfigLoaded = true;
 
+	if (Load_Odometer_From_EEPROM()) {
+	} else {
+		Set_Mesin_Error(104);
+	}
+
 	eeprom++;
 
     while(1) {
@@ -75,8 +79,13 @@ void Task_Storage(void *pvParameters) {
         		Set_Mesin_Error(103);
         	}
 
-        }else{
-        	//Simpan Odometer
+        }else if(isSaveOdo){
+        	if (Save_Odometer_To_EEPROM()) {
+        	} else {
+        		Set_Mesin_Error(105);
+        	}
+
+        	isSaveOdo = false;
         }
     }
 }
@@ -175,7 +184,7 @@ bool Load_Odometer_From_EEPROM(void) {
 
     HAL_StatusTypeDef status = HAL_I2C_Mem_Read(
         &hi2c1, EEPROM_I2C_ADDR,
-        ADDR_ODOMETER, I2C_MEMADD_SIZE_16BIT,
+        ADDR_ODOMETER, IC_ADDRESS_SIZE,
         (uint8_t*)bufferOdo, total_ukuran_baca, 1000
     );
 
@@ -220,7 +229,7 @@ bool Save_Odometer_To_EEPROM(void) {
     for (uint16_t i = 0; i < ukuran_struct; i++) {
         HAL_StatusTypeDef status = HAL_I2C_Mem_Write(
             &hi2c1, EEPROM_I2C_ADDR,
-            alamat_target + i, I2C_MEMADD_SIZE_16BIT,
+            alamat_target + i, IC_ADDRESS_SIZE,
             &pData[i], 1, 100
         );
 
@@ -231,6 +240,41 @@ bool Save_Odometer_To_EEPROM(void) {
 
     return true;
 }
+
+bool Reset_Odometer_EEPROM(void) {
+    // 1. Reset nilai di memori RAM (SRAM) terlebih dahulu
+    mesinOdo.totalTitikLas = 0;
+    mesinOdo.totalJarakXmm = 0;
+    mesinOdo.totalJarakYmm = 0;
+
+    uint8_t *pData = (uint8_t*)&mesinOdo;
+    uint16_t ukuran_struct = sizeof(Odometer_t); // 12 Byte
+
+    // 2. Lakukan perulangan untuk menimpa SELURUH SLOT (5 Slot)
+    for (uint8_t slot = 0; slot < MAX_ODO_SLOTS; slot++) {
+
+        // Hitung alamat fisik untuk masing-masing slot
+        uint16_t alamat_target = ADDR_ODOMETER + (slot * ukuran_struct);
+
+        // 3. Tulis Byte-by-Byte secara aman untuk slot ini
+        for (uint16_t i = 0; i < ukuran_struct; i++) {
+            HAL_StatusTypeDef status = HAL_I2C_Mem_Write(
+                &hi2c1, EEPROM_I2C_ADDR,
+                alamat_target + i, I2C_MEMADD_SIZE_16BIT,
+                &pData[i], 1, 100
+            );
+
+            if (status != HAL_OK) return false;
+
+            // Waktu panggang EEPROM fisik maksimal 5ms per byte
+            vTaskDelay(pdMS_TO_TICKS(5));
+
+        }
+    }
+
+    return true;
+}
+
 
 void Load_Default_Value(void){
     eepromSettings.magicNumber = MAGIC_NUMBER;
