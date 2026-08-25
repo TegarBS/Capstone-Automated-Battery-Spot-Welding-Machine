@@ -10,7 +10,7 @@
 
 void Task_Storage(void *pvParameters);
 
-void Load_Settings_From_EEPROM(void);
+bool Load_Settings_From_EEPROM(void);
 bool Save_Settings_To_EEPROM(void);
 
 void Load_Default_Value(void);

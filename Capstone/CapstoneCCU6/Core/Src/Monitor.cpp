@@ -15,7 +15,7 @@
  */
 void Task_Monitor(void *pvParameters) {
 
-	for(uint32_t t = 0; t < 1000; t += 10) {
+	for(uint32_t t = 0; t < 200; t += 10) {
 		vTaskDelay(pdMS_TO_TICKS(10));
 		HAL_IWDG_Refresh(&hiwdg);
 	}

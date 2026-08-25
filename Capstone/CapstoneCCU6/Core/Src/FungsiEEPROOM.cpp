@@ -21,67 +21,102 @@ extern IWDG_HandleTypeDef hiwdg;
 
 // Kavling Memori
 #define ADDR_ODOMETER   0x0000  // Mulai dari byte 0
-#define ADDR_SETTINGS   0x0020  // Mulai dari byte 32
+#define ADDR_SETTINGS   0x0040  // Mulai dari byte 64
+
+#define MAX_ODO_SLOTS      5         // 32 Byte ruang / 4 Byte data = 8 Slot
+#define WEAR_LEVEL_LIMIT   100000    // Pindah slot setiap 100 ribu titik las
 
 #define MAGIC_NUMBER 0xABCD1234      // Kode rahasia penanda Flash valid
+
+#define IC_ADDRESS_SIZE I2C_MEMADD_SIZE_16BIT
 
 
 void Task_Storage(void *pvParameters) {
 	vTaskDelay(pdMS_TO_TICKS(100));
+
+	if (Load_Settings_From_EEPROM()) {
+		// Fisik sukses, sekarang cek validitas datanya
+		if (eepromSettings.magicNumber == MAGIC_NUMBER) {
+			// DATA VALID & SUKSES! Mesin siap digunakan dengan setelan terakhir.
+			//Set_Mesin_Error(100);
+		} else {
+			// Data ditarik dengan sukses, TAPI isinya kosong (EEPROM baru/corrupt)
+			Set_Mesin_Error(101);
+			Load_Default_Value();
+			//Save_Settings_To_EEPROM(); // Tulis nilai default ke EEPROM agar besok valid
+		}
+
+	} else {
+		// Gagal fisik (Kabel I2C putus, atau chip EEPROM rusak)
+		Set_Mesin_Error(102);
+		Load_Default_Value(); // Beri nilai aman agar mesin tidak HardFault
+	}
+
+	Salin_Data_Ke_Register();
+	Update_Motor_Param_From_Settings();
+
+	isConfigLoaded = true;
+
 	eeprom++;
 
     while(1) {
         // Tidur pulas sampai ada yang menyuruh Save
-        if (xSemaphoreTake(Sem_MintaSave, portMAX_DELAY) == pdTRUE) {
+        if (xSemaphoreTake(Sem_MintaSave, pdMS_TO_TICKS(50)) == pdTRUE) {
 
         	eeprom+=100;
             // Lakukan penulisan 300ms
-            Save_Settings_To_EEPROM();
             Ambil_Data_Dari_Holding_Register();
             Update_Motor_Param_From_Settings();
 
+        	if (Save_Settings_To_EEPROM()) {
+        		//Berhasil menyimpan konfig
+        	} else {
+        		//I2C fail
+        		Set_Mesin_Error(103);
+        	}
 
-            // Jangan lupa reset IWDG di dalam fungsi Save-nya
+        }else{
+        	//Simpan Odometer
         }
     }
 }
 
+extern "C" void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
+    if (hi2c->Instance == I2C1) {
+        // Bangunkan Task yang sedang menunggu xSemaphoreTake di fungsi Load
+        BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+        xSemaphoreGiveFromISR(Sem_I2C_Rx, &xHigherPriorityTaskWoken);
+        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+    }
+}
 
 // --- FUNGSI MEMBACA DARI FLASH ---
-void Load_Settings_From_EEPROM(void) {
-
+bool Load_Settings_From_EEPROM(void) {
     uint8_t *pData = (uint8_t*)&eepromSettings;
     uint16_t ukuran_struct = sizeof(PermanentSettings_t);
 
-    // 1. Tarik semua isi EEPROM sekaligus ke dalam Struct RAM sementara
-    HAL_StatusTypeDef status = HAL_I2C_Mem_Read(
+    // 1. Kuras Semaphore agar tidak ada "sinyal hantu"
+    xSemaphoreTake(Sem_I2C_Rx, 0);
+
+    // 2. Tembakkan perintah tarik data via DMA
+    HAL_StatusTypeDef status = HAL_I2C_Mem_Read_DMA(
         &hi2c1, EEPROM_I2C_ADDR,
-        ADDR_SETTINGS, I2C_MEMADD_SIZE_16BIT,
-        pData, ukuran_struct, 1000
+        ADDR_SETTINGS, IC_ADDRESS_SIZE,
+        pData, ukuran_struct
     );
 
-    // 2. Cek apakah komunikasi kabel I2C sukses
+    // Jika bus I2C sibuk atau kabel putus sejak awal
     if (status != HAL_OK) {
-        // Gagal membaca (kabel putus atau IC rusak)
-        Load_Default_Value(); // Isi dengan default pabrik agar tidak HardFault
-        Salin_Data_Ke_Register();
-        return;
+        return false;
     }
 
-    // 3. CEK MAGIC NUMBER (Apakah EEPROM masih kosong/baru dari toko?)
-    // IC EEPROM baru dari pabrik biasanya berisi 0xFF di seluruh byte-nya.
-    if (eepromSettings.magicNumber == MAGIC_NUMBER) {
-        // DATA VALID! Magic Number cocok.
-        // Data sudah otomatis masuk ke struct eepromSettings melalui pointer pData
-    } else {
-    	eeprom+=10;
-        Load_Default_Value();
+    // 3. Tidurkan Task RTOS maksimal 1 detik menunggui DMA
+    if (xSemaphoreTake(Sem_I2C_Rx, pdMS_TO_TICKS(1000)) == pdTRUE) {
+        return true; // Transmisi I2C Sukses! (Isi datanya belum divalidasi)
     }
 
-    // 4. Sinkronisasi data ke HMI
-    Salin_Data_Ke_Register();
-
-    return;
+    // Jika sampai baris ini, terjadi Timeout (IC mati / kabel putus di jalan)
+    return false;
 }
 
 bool Save_Settings_To_EEPROM(void) {
@@ -89,9 +124,6 @@ bool Save_Settings_To_EEPROM(void) {
     if (isAutoWeldActive || isPerformManualJog || motorX.isMoving()) {
         return false; // Mesin sedang sibuk
     }
-
-    // 2. Ambil data terbaru dari HMI
-    Ambil_Data_Dari_Holding_Register();
 
     // 3. Konversi struct menjadi deretan byte (array)
     uint8_t *pData = (uint8_t*)&eepromSettings;
@@ -103,7 +135,7 @@ bool Save_Settings_To_EEPROM(void) {
         // Parameter: Handle I2C, Alamat IC, Alamat Memori Internal (16-BIT!), Ukuran Alamat, Data, Panjang, Timeout
         HAL_StatusTypeDef status = HAL_I2C_Mem_Write(
             &hi2c1, EEPROM_I2C_ADDR,
-            ADDR_SETTINGS + i, I2C_MEMADD_SIZE_16BIT,
+            ADDR_SETTINGS + i, IC_ADDRESS_SIZE,
             &pData[i], 1, 100
         );
 
@@ -134,6 +166,70 @@ void Ambil_Data_Dari_Holding_Register(void){
 	memcpy(&eepromSettings.stepsPerMmX,
 		   &Holding_Registers[EEPROM_START_MODBUS_REG],
 		   TOTAL_EEPROM_PARAMS * sizeof(uint16_t));
+}
+
+bool Load_Odometer_From_EEPROM(void) {
+    // 1. Buffer sekarang menggunakan cetakan Struct, bukan uint32_t
+    Odometer_t bufferOdo[MAX_ODO_SLOTS];
+    uint16_t total_ukuran_baca = sizeof(bufferOdo); // 5 x 12 = 60 Byte
+
+    HAL_StatusTypeDef status = HAL_I2C_Mem_Read(
+        &hi2c1, EEPROM_I2C_ADDR,
+        ADDR_ODOMETER, I2C_MEMADD_SIZE_16BIT,
+        (uint8_t*)bufferOdo, total_ukuran_baca, 1000
+    );
+
+    if (status != HAL_OK) {
+        mesinOdo.totalTitikLas = 0;
+        mesinOdo.totalJarakXmm = 0;
+        mesinOdo.totalJarakYmm = 0;
+        return false;
+    }
+
+    // 2. ALGORITMA PENCARIAN BARU (Fokus pada totalTitikLas)
+    uint32_t nilai_tertinggi = 0;
+    uint8_t index_terbaru = 0; // Mengingat di slot mana data terbaru berada
+
+    for(int i = 0; i < MAX_ODO_SLOTS; i++) {
+        // Cek jika slot tidak kosong (0xFFFFFFFF) dan totalTitikLas lebih besar
+        if (bufferOdo[i].totalTitikLas != 0xFFFFFFFF && bufferOdo[i].totalTitikLas > nilai_tertinggi) {
+            nilai_tertinggi = bufferOdo[i].totalTitikLas;
+            index_terbaru = i;
+        }
+    }
+
+    // 3. Salin seluruh isi struct dari slot yang paling baru
+    mesinOdo = bufferOdo[index_terbaru];
+
+    return true;
+}
+
+bool Save_Odometer_To_EEPROM(void) {
+    uint8_t *pData = (uint8_t*)&mesinOdo;
+    uint16_t ukuran_struct = sizeof(Odometer_t); // 4 Byte
+
+    // 1. Tentukan Slot Aktif berdasarkan total las
+    // Contoh: 150.000 / 100.000 = 1. (1 % 8) = Slot 1
+    // Contoh: 850.000 / 100.000 = 8. (8 % 8) = Slot 0 (Kembali ke awal)
+    uint8_t slot_aktif = (mesinOdo.totalTitikLas / WEAR_LEVEL_LIMIT) % MAX_ODO_SLOTS;
+
+    // 2. Kalkulasi alamat fisik di EEPROM
+    uint16_t alamat_target = ADDR_ODOMETER + (slot_aktif * ukuran_struct);
+
+    // 3. Tulis per byte secara aman ke alamat yang sudah digeser
+    for (uint16_t i = 0; i < ukuran_struct; i++) {
+        HAL_StatusTypeDef status = HAL_I2C_Mem_Write(
+            &hi2c1, EEPROM_I2C_ADDR,
+            alamat_target + i, I2C_MEMADD_SIZE_16BIT,
+            &pData[i], 1, 100
+        );
+
+        if (status != HAL_OK) return false;
+
+        vTaskDelay(pdMS_TO_TICKS(5)); // Waktu panggang EEPROM
+    }
+
+    return true;
 }
 
 void Load_Default_Value(void){

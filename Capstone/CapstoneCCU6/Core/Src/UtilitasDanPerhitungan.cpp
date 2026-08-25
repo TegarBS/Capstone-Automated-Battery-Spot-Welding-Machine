@@ -179,3 +179,40 @@ void Silinder_Hold(void){
 	HAL_GPIO_WritePin(RELAY_UP_GPIO_Port, RELAY_UP_Pin, GPIO_PIN_RESET);
 	HAL_GPIO_WritePin(RELAY_DOWN_GPIO_Port, RELAY_DOWN_Pin, GPIO_PIN_RESET);
 }
+
+// Definisikan alamat dasar (Base Address) khusus untuk Alarm di Holding Registers
+
+void Set_Mesin_Error(uint16_t errorCode) {
+    // 1. Abaikan jika nilai 0 (Bukan error)
+    if (errorCode == 0) {
+        return;
+    }
+
+    // 2. Ekstrak "Grup/Kategori" dari kode error (Digit ratusan)
+    // Contoh: 404 / 100 = 4 (Otomatis dibulatkan ke bawah karena integer)
+    uint16_t kategori = (errorCode / 100);
+
+    // 3. SABUK PENGAMAN (Boundary Check)
+    // Pastikan kode error berada di rentang 1xx hingga 5xx agar tidak menabrak memori lain
+    if (kategori < 1 || kategori > MAX_ALARM_CATEGORIES) {
+        return;
+    }
+
+    // 4. PEMETAAN OTOMATIS (Sesuai Rumus Anda)
+    uint16_t index_HR = kategori - 1;
+
+    // 5. Simpan ke Holding Register
+    // Jika ALARM_BASE_INDEX = 100 dan index_HR = 3, maka disimpan di Holding_Registers[103]
+    Holding_Registers[ALARM_BASE_INDEX + index_HR] = errorCode;
+
+    // ==========================================
+    // 6. KUNCI MESIN (SAFETY LATCH)
+    // ==========================================
+    // Karena ini error sungguhan, paksa semua pergerakan berhenti!
+    // motorX.stop();
+    // motorY.stop();
+    // motorZ.stop();
+
+    // (Opsional) Nyalakan Buzzer atau sirine
+    // HAL_GPIO_WritePin(BUZZER_PORT, BUZZER_PIN, GPIO_PIN_SET);
+}

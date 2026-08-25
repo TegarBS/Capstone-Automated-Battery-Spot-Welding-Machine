@@ -49,4 +49,6 @@ void Silinder_Up(void);
 void Silinder_Down(void);
 void Silinder_Hold(void);
 
+void Set_Mesin_Error(uint16_t errorCode);
+
 #endif /* SRC_UTILITASDANPERHITUNGAN_H_ */

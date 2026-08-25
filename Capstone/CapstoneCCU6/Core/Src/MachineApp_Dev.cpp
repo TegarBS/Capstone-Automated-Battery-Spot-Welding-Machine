@@ -69,15 +69,12 @@ void MachineApp_Loop(void) {}
 void Task_Sequencer(void *pvParameters) {
 	Delay_With_Watchdog(500, heartbeat_Sequencer); // Jeda inisialisasi hardware
 
-    for(uint32_t t = 0; t < 1000; t += 10) {
+	//Menunggu data konfigurasi dari Task Storage
+    while(!isConfigLoaded){
         vTaskDelay(pdMS_TO_TICKS(10));
         heartbeat_Sequencer = true;
+        //status = meunggu data konfig
     }
-
-	//Load_Settings_From_EEPROM();
-	Load_Default_Value();
-	Salin_Data_Ke_Register();
-	Update_Motor_Param_From_Settings();
 
 	HAL_GPIO_WritePin(STEP_X_GPIO_Port, STEP_X_Pin , GPIO_PIN_SET);
 	HAL_GPIO_WritePin(STEP_Y_GPIO_Port, STEP_Y_Pin , GPIO_PIN_SET);
@@ -115,14 +112,6 @@ void Task_Sequencer(void *pvParameters) {
     }
 }
 
-extern "C" void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
-    if (hi2c->Instance == I2C1) {
-        // Bangunkan Task yang sedang menunggu xSemaphoreTake di fungsi Load
-        BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-        xSemaphoreGiveFromISR(Sem_I2C_Rx, &xHigherPriorityTaskWoken);
-        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-    }
-}
 
 // ---------------------------------------------------------
 // HELPER 1: Menunggu Motor Selesai Bergerak (Aman dari Watchdog & E-Stop)
@@ -173,7 +162,7 @@ bool Homing_Silinder_Z(void) {
 
         // 3. Cek Timeout (Mekanik macet / angin kompresor habis)
         if ((HAL_GetTick() - startTime) > eepromSettings.time_out_pneumatic_ms) {
-            isAborted = true;        // Kunci mesin (Emergency)
+                    // Kunci mesin (Emergency)
             // kode_alarm_sistem = 102; // Error Silinder Gagal Naik
             return false;            // Lapor Gagal!
         }
@@ -191,7 +180,11 @@ bool Homing_Silinder_Z(void) {
 void Perform_Homing_Sequence(void) {
     Update_Motor_Param_Homing_From_Settings();
 
-   // if (!Homing_Silinder_Z()) return;
+   if (!Homing_Silinder_Z()) {
+	   isAborted = true;
+	   Set_Mesin_Error(301);
+	   return;
+   }
 //    {
 		// Jika gagal naik (timeout), tahan Task di sini (jangan lanjut Homing XY)
 		// Tunggu operator menekan tombol Reset/Clear Alarm di HMI
@@ -237,7 +230,21 @@ void Perform_Homing_Sequence(void) {
 }
 
 void Perform_Auto_Weld_Cycle(void) {
+
+    if (!isMachineHomed) {
+        isPerformHoming = true; return;
+    }
+
 	if (isFirstWeldCycle) {
+
+		if(HAL_GPIO_ReadPin(REED_TOP_GPIO_Port, REED_TOP_Pin) != REED_TOP_ON){
+		   if (!Homing_Silinder_Z()) {
+			   isAborted = true;
+			   Set_Mesin_Error(301);
+			   return;
+		   }
+		}
+
 		if (configLas.startKolom > configLas.totalKolom || configLas.startBaris > configLas.totalBaris) {
 			indexKolomAktual = 0;
 			indexBarisAktual = 0;
@@ -246,12 +253,8 @@ void Perform_Auto_Weld_Cycle(void) {
 			indexBarisAktual = configLas.startBaris;
 		}
 
-		isFirstWeldCycle = false; // GEMBOK PINTUNYA!
+		isFirstWeldCycle = false;
 	}
-
-    if (!isMachineHomed) {
-        isPerformHoming = true; return;
-    }
 
     if (indexBarisAktual >= configLas.totalBaris) {
         isAutoWeldActive = false; return;
@@ -288,8 +291,6 @@ void Perform_Auto_Weld_Cycle(void) {
 //			return;             // Hentikan seluruh mesin
 //			//Kirim_Pesan_Error_Ke_HMI();   // Beritahu layar Haiwell
 //		}
-
-
 
         Delay_With_Watchdog(500, heartbeat_Sequencer);
 
@@ -336,6 +337,10 @@ void Perform_Manual_Jog(void) {
 	int32_t targetAbsY = motorY.getCurrentPositionPulse() + Convert_mm_to_PulseY(jogManY_mm);
 	int32_t targetAbsZ = motorZ.getCurrentPositionPulse() + Convert_mm_to_PulseZ(jogManZ_mm);
 
+	if(targetAbsX > Convert_mm_to_PulseX(eepromSettings.maxTravelX)) Set_Mesin_Error(206);
+	if(targetAbsY > Convert_mm_to_PulseX(eepromSettings.maxTravelY)) Set_Mesin_Error(207);
+	if(targetAbsZ > Convert_mm_to_PulseX(eepromSettings.maxTravelZ)) Set_Mesin_Error(208);
+
     isNavigating = true;
     motorX.setTargetPulse(targetAbsX);
     motorY.setTargetPulse(targetAbsY);
@@ -373,7 +378,7 @@ bool Eksekusi_Las(uint16_t waktu_las_ms) {
         // Pengecekan Timeout (Jika macet lebih dari 2 detik)
         if ((HAL_GetTick() - startTime) > eepromSettings.time_out_pneumatic_ms) {
             Silinder_Up();// Paksa naikkan silinder
-            //kode_alarm_sistem = 101; // Contoh: Error Silinder Gagal Turun
+            Set_Mesin_Error(302);
             return false;
         }
 
@@ -414,6 +419,7 @@ bool Eksekusi_Las(uint16_t waktu_las_ms) {
 
         if ((HAL_GetTick() - startTime) > eepromSettings.time_out_pneumatic_ms) {
             //kode_alarm_sistem = 102; // Contoh: Error Silinder Gagal Naik
+        	Set_Mesin_Error(301);
             return false; // Berhenti dan lapor error
         }
 
@@ -456,6 +462,7 @@ bool Perform_Las_Double_Pulse(uint32_t pre_heat_us, uint32_t jeda_us, uint32_t m
             HAL_GPIO_WritePin(WELD_PIN_GPIO_Port, WELD_PIN_Pin, GPIO_PIN_RESET);
             HAL_GPIO_WritePin(ENABLE_PIN_GPIO_Port, ENABLE_PIN_Pin, GPIO_PIN_RESET);
             HAL_TIM_Base_Stop_IT(&htim5);
+            Set_Mesin_Error(303);
             return false;
         }
     }
@@ -492,6 +499,7 @@ bool Perform_Las_Double_Pulse(uint32_t pre_heat_us, uint32_t jeda_us, uint32_t m
             HAL_GPIO_WritePin(WELD_PIN_GPIO_Port, WELD_PIN_Pin, GPIO_PIN_RESET);
             HAL_GPIO_WritePin(ENABLE_PIN_GPIO_Port, ENABLE_PIN_Pin, GPIO_PIN_RESET);
             HAL_TIM_Base_Stop_IT(&htim5);
+            Set_Mesin_Error(303);
             return false;
         }
     }

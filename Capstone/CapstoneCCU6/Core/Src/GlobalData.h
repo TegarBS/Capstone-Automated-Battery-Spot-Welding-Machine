@@ -13,7 +13,7 @@
 #include "semphr.h"
 #include "StepperMotor.h"
 
-#define TOTAL_HOLDING_REGISTERS 70
+#define TOTAL_HOLDING_REGISTERS 80
 #define TOTAL_INPUT_REGISTER 10
 #define TOTAL_COILS 10
 #define TOTAL_DISCRETE_INPUT 10
@@ -21,14 +21,25 @@
 #define EEPROM_START_MODBUS_REG 20
 #define TOTAL_EEPROM_PARAMS 32
 
+#define ALARM_BASE_INDEX 60
+#define MAX_ALARM_CATEGORIES 5 // Kapasitas 5 Kategori Error (100 - 500)
+
 //#define SKALA_FLOAT 100.0f
 
 
 extern volatile uint16_t errorCallback;
 
 // =========================================================
-// [STRUCT PARAMETER PERMANEN (EEPROM)]
+// [STRUCT PARAMETER PERMANEN (EEPROM) DAN ODOMETER]
 // =========================================================
+typedef struct {
+    uint32_t totalTitikLas;
+    uint32_t totalJarakXmm;
+    uint32_t totalJarakYmm;
+} Odometer_t;
+
+extern Odometer_t mesinOdo;
+
 typedef struct __attribute__((aligned(4))){
     uint32_t magicNumber; // Penanda apakah Flash sudah pernah diisi atau masih kosong
 
@@ -135,6 +146,8 @@ extern volatile bool isPerformManualJog;
 extern volatile bool isMachineHomed;
 extern volatile bool isFirstWeldCycle;
 extern volatile bool isPerformWeld;
+extern volatile bool isConfigLoaded;
+extern volatile bool isSaveOdo;
 
 // =========================================================
 // [RTOS HANDLES]

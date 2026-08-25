@@ -13,6 +13,7 @@ volatile uint16_t errorCallback = 0;
 // [STRUCT PARAMETER PERMANEN (EEPROM)]
 // =========================================================
 PermanentSettings_t eepromSettings = {0}; // Nilai awal kosong
+Odometer_t mesinOdo = {0};
 
 // =========================================================
 // 1 [STRUCT & KONSTANTA]
@@ -52,6 +53,8 @@ volatile bool isPerformManualJog = false;
 volatile bool isMachineHomed = false;
 volatile bool isFirstWeldCycle = false;
 volatile bool isPerformWeld = false;
+volatile bool isConfigLoaded = false;
+volatile bool isSaveOdo = false;
 
 // =========================================================
 // [RTOS HANDLES]

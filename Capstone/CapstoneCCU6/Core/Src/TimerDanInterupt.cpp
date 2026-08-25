@@ -75,6 +75,11 @@ extern "C" void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 	// Abaikan interupsi jika mesin sedang dalam fase mundur (Pull-Off)
 	if (ignoreLimitSwitch) return;
 
+	if(!isPerformHoming){
+		isAborted = true;
+		return;
+	}
+
 	bool isHit = false;
 
 	// 1. Deteksi Limit Switch Sumbu X
