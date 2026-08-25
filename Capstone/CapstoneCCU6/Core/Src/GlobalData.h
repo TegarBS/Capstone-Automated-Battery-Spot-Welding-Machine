@@ -143,6 +143,7 @@ extern SemaphoreHandle_t SinyalPosisiTercapai;
 extern SemaphoreHandle_t Sem_DataDiterima;
 extern SemaphoreHandle_t Sem_MintaSave;
 extern SemaphoreHandle_t Sem_WeldDone;
+extern SemaphoreHandle_t Sem_I2C_Rx;
 
 // =========================================================
 // [Modbus Communication]
@@ -167,12 +168,15 @@ extern uint16_t indexBarisAktual;
 // Pointer Hardware dari CubeMX (main.c)
 // =========================================================
 extern UART_HandleTypeDef huart1;
+
 extern TIM_HandleTypeDef htim2;
 extern TIM_HandleTypeDef htim3;
 extern TIM_HandleTypeDef htim4;
 extern TIM_HandleTypeDef htim5;
 
 extern IWDG_HandleTypeDef hiwdg;
+
+extern I2C_HandleTypeDef hi2c1;
 
 // =========================================================
 // Variabel "Detak Jantung" (Heartbeat) untuk setiap Task

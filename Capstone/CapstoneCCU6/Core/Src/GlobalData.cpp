@@ -60,6 +60,7 @@ SemaphoreHandle_t SinyalPosisiTercapai;
 SemaphoreHandle_t Sem_DataDiterima;
 SemaphoreHandle_t Sem_MintaSave;
 SemaphoreHandle_t Sem_WeldDone;
+SemaphoreHandle_t Sem_I2C_Rx;
 
 // =========================================================
 // [Modbus Communication]

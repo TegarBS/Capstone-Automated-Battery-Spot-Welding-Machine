@@ -55,6 +55,7 @@ void MachineApp_Init(void) {
     Sem_DataDiterima = xSemaphoreCreateBinary();
     Sem_MintaSave = xSemaphoreCreateBinary();
     Sem_WeldDone = xSemaphoreCreateBinary();
+    Sem_I2C_Rx = xSemaphoreCreateBinary();
 
     // Buat Task RTOS
     xTaskCreate(Task_Sequencer, "Task_Seq", 512, NULL, 2, NULL);
@@ -68,7 +69,14 @@ void MachineApp_Loop(void) {}
 void Task_Sequencer(void *pvParameters) {
 	Delay_With_Watchdog(500, heartbeat_Sequencer); // Jeda inisialisasi hardware
 
-	Load_Settings_From_EEPROM();
+    for(uint32_t t = 0; t < 1000; t += 10) {
+        vTaskDelay(pdMS_TO_TICKS(10));
+        heartbeat_Sequencer = true;
+    }
+
+	//Load_Settings_From_EEPROM();
+	Load_Default_Value();
+	Salin_Data_Ke_Register();
 	Update_Motor_Param_From_Settings();
 
 	HAL_GPIO_WritePin(STEP_X_GPIO_Port, STEP_X_Pin , GPIO_PIN_SET);
@@ -107,7 +115,14 @@ void Task_Sequencer(void *pvParameters) {
     }
 }
 
-
+extern "C" void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
+    if (hi2c->Instance == I2C1) {
+        // Bangunkan Task yang sedang menunggu xSemaphoreTake di fungsi Load
+        BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+        xSemaphoreGiveFromISR(Sem_I2C_Rx, &xHigherPriorityTaskWoken);
+        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+    }
+}
 
 // ---------------------------------------------------------
 // HELPER 1: Menunggu Motor Selesai Bergerak (Aman dari Watchdog & E-Stop)
@@ -176,7 +191,7 @@ bool Homing_Silinder_Z(void) {
 void Perform_Homing_Sequence(void) {
     Update_Motor_Param_Homing_From_Settings();
 
-    if (!Homing_Silinder_Z()) return;
+   // if (!Homing_Silinder_Z()) return;
 //    {
 		// Jika gagal naik (timeout), tahan Task di sini (jangan lanjut Homing XY)
 		// Tunggu operator menekan tombol Reset/Clear Alarm di HMI
@@ -267,16 +282,18 @@ void Perform_Auto_Weld_Cycle(void) {
 
         isPerformWeld = true;
 
-		if (!Eksekusi_Las(eepromSettings.main_pulse_weld_time)) {
-			// TERJADI ERROR PNEUMATIK!
-			isAborted = true;
-			return;             // Hentikan seluruh mesin
-			//Kirim_Pesan_Error_Ke_HMI();   // Beritahu layar Haiwell
-		}
+//		if (!Eksekusi_Las(eepromSettings.main_pulse_weld_time)) {
+//			// TERJADI ERROR PNEUMATIK!
+//			isAborted = true;
+//			return;             // Hentikan seluruh mesin
+//			//Kirim_Pesan_Error_Ke_HMI();   // Beritahu layar Haiwell
+//		}
 
-		isPerformWeld = false;
+
 
         Delay_With_Watchdog(500, heartbeat_Sequencer);
+
+        isPerformWeld = false;
     }
 
 	// 5. UPDATE INDEX BATERAI SELANJUTNYA (ZIG-ZAG FISIK)
