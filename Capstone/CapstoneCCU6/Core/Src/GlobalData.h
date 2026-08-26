@@ -148,6 +148,10 @@ extern volatile bool isFirstWeldCycle;
 extern volatile bool isPerformWeld;
 extern volatile bool isConfigLoaded;
 extern volatile bool isSaveOdo;
+extern volatile bool isPerformPneuUp;
+extern volatile bool isPerformPneuDown;
+
+extern volatile bool isBusy;
 
 // =========================================================
 // [RTOS HANDLES]

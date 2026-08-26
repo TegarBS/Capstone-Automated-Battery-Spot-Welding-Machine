@@ -55,6 +55,10 @@ volatile bool isFirstWeldCycle = false;
 volatile bool isPerformWeld = false;
 volatile bool isConfigLoaded = false;
 volatile bool isSaveOdo = false;
+volatile bool isPerformPneuUp = false;
+volatile bool isPerformPneuDown = false;
+
+volatile bool isBusy = false;
 
 // =========================================================
 // [RTOS HANDLES]

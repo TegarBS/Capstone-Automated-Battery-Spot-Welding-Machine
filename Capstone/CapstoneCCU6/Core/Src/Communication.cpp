@@ -33,6 +33,8 @@ enum ModbusCoilAddress {
     COIL_PAUSE_RESUME    = 0x0003,
     COIL_MANUAL_JOG      = 0x0004,
 	COIL_MANUAL_WELD     = 0x0005,
+	COIL_PNEU_UP         = 0x0006,
+	COIL_PNEU_DOWN       = 0x0007,
 
     COIL_SAVE_TO_FLASH   = 0x000A,
     COIL_RESET_SYSTEM    = 0x000B,
@@ -325,6 +327,12 @@ bool Baca_Status_Coil(uint16_t coil_addr) {
         case COIL_MANUAL_WELD:
         	return isPerformWeld;
 
+        case COIL_PNEU_UP:
+        	return isPerformPneuUp;
+
+        case COIL_PNEU_DOWN:
+        	return isPerformPneuDown;
+
         default:
             return false;
     }
@@ -510,7 +518,7 @@ void Function_Code_05_WRITE_SINGLE_COIL(uint8_t* rxBufferInput, uint8_t len) {
         case COIL_START_AUTO_WELD:
             if (coil_val == MODBUS_COIL_ON) {
 
-            	if (isPerformHoming || isPerformManualJog || isPerformWeld){
+            	if (isBusy){
             		Send_Modbus_Exception(rxBufferInput[0], 0x05, MODBUS_EXCEPTION_BUSY);
     				send_echo = false; // Batal kirim ACK
     				break;             // Langsung lompat keluar dari blok case ini
@@ -531,7 +539,7 @@ void Function_Code_05_WRITE_SINGLE_COIL(uint8_t* rxBufferInput, uint8_t len) {
 
                 isFirstWeldCycle = true;
                 isAutoWeldActive = true;
-
+                isBusy = true;
 
             }
             break;
@@ -540,17 +548,19 @@ void Function_Code_05_WRITE_SINGLE_COIL(uint8_t* rxBufferInput, uint8_t len) {
             if (coil_val == MODBUS_COIL_ON) {
                 isAborted = true;
                 isPaused = false;
+                isBusy = false;
             }
             break;
 
         case COIL_REQUEST_HOMING:
             if (coil_val == MODBUS_COIL_ON) {
-            	if (isAutoWeldActive || isPerformManualJog || isPerformWeld){
+            	if (isBusy){
             		Send_Modbus_Exception(rxBufferInput[0], 0x05, MODBUS_EXCEPTION_BUSY);
     				send_echo = false; // Batal kirim ACK
     				break;             // Langsung lompat keluar dari blok case ini
             	}
                 isPerformHoming = true;
+                isBusy = true;
             }
             break;
 
@@ -560,22 +570,24 @@ void Function_Code_05_WRITE_SINGLE_COIL(uint8_t* rxBufferInput, uint8_t len) {
 
         case COIL_MANUAL_JOG:
             if (coil_val == MODBUS_COIL_ON) {
-            	if (isPerformHoming || isAutoWeldActive || isPerformWeld){
+            	if (isBusy){
             		Send_Modbus_Exception(rxBufferInput[0], 0x05, MODBUS_EXCEPTION_BUSY);
     				send_echo = false; // Batal kirim ACK
     				break;             // Langsung lompat keluar dari blok case ini
             	}
                 isPerformManualJog = true;
+                isBusy = true;
             }
             break;
 
         case COIL_SAVE_TO_FLASH:
             if (coil_val == MODBUS_COIL_ON) {
-            	if (isPerformHoming || isAutoWeldActive || isPerformWeld || isPerformManualJog){
+            	if (isBusy){
             		Send_Modbus_Exception(rxBufferInput[0], 0x05, MODBUS_EXCEPTION_BUSY);
     				send_echo = false; // Batal kirim ACK
     				break;             // Langsung lompat keluar dari blok case ini
             	}
+            	isBusy = true;
             	xSemaphoreGive(Sem_MintaSave);
             }
             break;
@@ -602,13 +614,32 @@ void Function_Code_05_WRITE_SINGLE_COIL(uint8_t* rxBufferInput, uint8_t len) {
 
         case COIL_MANUAL_WELD:
             if (coil_val == MODBUS_COIL_ON) {
-            	if (isPerformHoming || isAutoWeldActive || isPerformManualJog || isNavigating){
+            	if (isBusy){
             		Send_Modbus_Exception(rxBufferInput[0], 0x05, MODBUS_EXCEPTION_BUSY);
     				send_echo = false; // Batal kirim ACK
     				break;             // Langsung lompat keluar dari blok case ini
             	}
+            	isBusy = true;
                 isPerformWeld = true;
             }
+            break;
+
+        case COIL_PNEU_UP:
+        	if (isBusy && (coil_val == MODBUS_COIL_ON)){
+        		Send_Modbus_Exception(rxBufferInput[0], 0x05, MODBUS_EXCEPTION_BUSY);
+				send_echo = false; // Batal kirim ACK
+				break;             // Langsung lompat keluar dari blok case ini
+        	}
+            isPerformPneuUp = (coil_val == MODBUS_COIL_ON);
+            break;
+
+        case COIL_PNEU_DOWN:
+        	if (isBusy && (coil_val == MODBUS_COIL_ON)){
+        		Send_Modbus_Exception(rxBufferInput[0], 0x05, MODBUS_EXCEPTION_BUSY);
+				send_echo = false; // Batal kirim ACK
+				break;             // Langsung lompat keluar dari blok case ini
+        	}
+            isPerformPneuDown = (coil_val == MODBUS_COIL_ON);
             break;
 
         default:

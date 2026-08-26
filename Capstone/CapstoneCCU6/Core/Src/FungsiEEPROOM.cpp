@@ -79,6 +79,8 @@ void Task_Storage(void *pvParameters) {
         		Set_Mesin_Error(103);
         	}
 
+        	isBusy = false;
+
         }else if(isSaveOdo){
         	if (Save_Odometer_To_EEPROM()) {
         	} else {

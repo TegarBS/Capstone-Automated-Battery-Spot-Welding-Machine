@@ -11,8 +11,11 @@
 #include "Communication.h"
 #include "GlobalData.h"
 #include "UtilitasDanPerhitungan.h"
+
 #include "FungsiEEPROM.h"
 #include "Monitor.h"
+
+#define SETTLING_TIME_MS 100
 
 void Task_Sequencer(void *pvParameters);
 
@@ -21,7 +24,7 @@ void Handle_Emergency_Abort(void);
 void Perform_Homing_Sequence(void);
 void Perform_Auto_Weld_Cycle(void);
 void Perform_Manual_Jog(void);
-bool Eksekusi_Las(uint16_t waktu_las_ms);
+bool Eksekusi_Las(void);
 bool Perform_Las_Double_Pulse(uint32_t pre_heat_us, uint32_t jeda_us, uint32_t main_weld_us);
 
 StepperMotor motorX(STEP_X_GPIO_Port, STEP_X_Pin, DIR_X_GPIO_Port, DIR_X_Pin, &htim2);
@@ -94,14 +97,54 @@ void Task_Sequencer(void *pvParameters) {
             Perform_Manual_Jog();
         }
         else if (isPerformWeld && !isAutoWeldActive && !isNavigating) {
-    		if (!Eksekusi_Las(eepromSettings.main_pulse_weld_time)) {
+    		if (!Eksekusi_Las()) {
     			// TERJADI ERROR PNEUMATIK!
     			isAborted = true;
     			continue;             // Hentikan seluruh mesin
     			//Kirim_Pesan_Error_Ke_HMI();   // Beritahu layar Haiwell
     		}
     		isPerformWeld = false;
+    		isBusy = false;
         }
+		else if (isPerformPneuUp) {
+			// 1. RISING EDGE
+			isBusy = true;
+			Silinder_Up();
+
+			while (isPerformPneuUp) {
+				vTaskDelay(pdMS_TO_TICKS(10)); // WAJIB ADA DELAY![cite: 6]
+				heartbeat_Sequencer = true;
+				if (isAborted) break;
+			}
+
+			// 3. FALLING EDGE
+			if (!isAborted) {
+				Silinder_Hold();
+				isBusy = false;
+			}
+		}
+        else if (isPerformPneuDown) {
+			// 1. RISING EDGE (Eksekusi saat HMI mulai menekan)
+        	isBusy = true;
+			Silinder_Down();
+
+			// 2. MENUNGGU (Tahan posisi selama flag masih TRUE)
+			while (isPerformPneuDown) {
+				// WAJIB pakai delay agar CPU bisa mengeksekusi Task_Komunikasi
+				vTaskDelay(pdMS_TO_TICKS(10));
+				heartbeat_Sequencer = true;    // Absen Watchdog IWDG
+
+				if (isAborted) break;          // Sabuk pengaman E-Stop
+			}
+
+			// 3. FALLING EDGE (Eksekusi seketika saat HMI melepas tekanan)
+			if (!isAborted) {
+				Silinder_Hold();
+				isBusy = false;
+			}
+		}
+
+
         else {
             // =========================================================
             // E. MODE STANDBY PURE (Menunggu Perintah)
@@ -128,6 +171,8 @@ bool Wait_Motors_Reach_Target(bool includeZ = false) {
 }
 
 void Handle_Emergency_Abort(void) {
+	Set_Mesin_Error(403);
+
 	isNavigating = false;
 
     isAutoWeldActive = false;
@@ -135,6 +180,7 @@ void Handle_Emergency_Abort(void) {
 	isPerformManualJog = false;
 	isPerformWeld = false;
 
+	isBusy = false;
     isAborted = false;
     isMachineHomed = false;
 
@@ -150,31 +196,21 @@ void Handle_Emergency_Abort(void) {
 bool Homing_Silinder_Z(void) {
     uint32_t startTime = 0;
 
-    // 1. Perintahkan Silinder Naik
     Silinder_Up();
     startTime = HAL_GetTick();
 
-    // 2. Tunggu sampai sensor atas menyala
     while (HAL_GPIO_ReadPin(REED_TOP_GPIO_Port, REED_TOP_Pin) != REED_TOP_ON) {
 
-        // Tidur 1ms agar CPU bisa mengerjakan Task lain
         vTaskDelay(pdMS_TO_TICKS(1));
 
-        // 3. Cek Timeout (Mekanik macet / angin kompresor habis)
         if ((HAL_GetTick() - startTime) > eepromSettings.time_out_pneumatic_ms) {
-                    // Kunci mesin (Emergency)
-            // kode_alarm_sistem = 102; // Error Silinder Gagal Naik
-            return false;            // Lapor Gagal!
+            return false;
         }
-
-        // 4. Lapor ke Watchdog agar tidak di-reset
         heartbeat_Sequencer = true;
     }
-
-    // 5. Silinder sudah di atas, tahan posisinya
     Silinder_Hold();
 
-    return true; // Lapor Sukses!
+    return true;
 }
 
 void Perform_Homing_Sequence(void) {
@@ -217,7 +253,9 @@ void Perform_Homing_Sequence(void) {
     Update_Motor_Param_From_Settings();
 
     isMachineHomed = true;
+
     isPerformHoming = false;
+    isBusy = false;
 }
 
 void Perform_Auto_Weld_Cycle(void) {
@@ -239,9 +277,16 @@ void Perform_Auto_Weld_Cycle(void) {
 		if (configLas.startKolom > configLas.totalKolom || configLas.startBaris > configLas.totalBaris) {
 			indexKolomAktual = 0;
 			indexBarisAktual = 0;
+			Set_Mesin_Error(501);
 		} else {
 			indexKolomAktual = configLas.startKolom;
 			indexBarisAktual = configLas.startBaris;
+		}
+
+		if((configLas.totalKolom * configLas.pitchX) > eepromSettings.maxTravelX || (configLas.totalBaris * configLas.pitchY) > eepromSettings.maxTravelY){
+			Set_Mesin_Error(502);
+			isAutoWeldActive = false;   // 2. Batalkan mode Auto
+			isAborted = true;
 		}
 
 		isFirstWeldCycle = false;
@@ -249,6 +294,7 @@ void Perform_Auto_Weld_Cycle(void) {
 
     if (indexBarisAktual >= configLas.totalBaris) {
         isAutoWeldActive = false;
+        isBusy = false;
         isSaveOdo = true;
         return;
     }
@@ -281,7 +327,7 @@ void Perform_Auto_Weld_Cycle(void) {
 
         isPerformWeld = true;
 
-		if (!Eksekusi_Las(eepromSettings.main_pulse_weld_time)) {
+		if (!Eksekusi_Las()) {
 			// TERJADI ERROR PNEUMATIK!
 			isAborted = true;
 			return;
@@ -347,6 +393,7 @@ void Perform_Manual_Jog(void) {
 
     isNavigating = false;
     isPerformManualJog = false;
+    isBusy = false;
 
     // Reset Register
     Holding_Registers[6] = 0;
@@ -354,7 +401,7 @@ void Perform_Manual_Jog(void) {
 	Holding_Registers[10] = 0;
 }
 
-bool Eksekusi_Las(uint16_t waktu_las_ms) {
+bool Eksekusi_Las(void) {
 	uint32_t startTime;
     // ==========================================================
     // 1. SILINDER TURUN
@@ -387,7 +434,7 @@ bool Eksekusi_Las(uint16_t waktu_las_ms) {
 
     // [TIPS INDUSTRI]: Beri jeda sedikit setelah sensor tersentuh agar
     // tekanan pneumatik benar-benar padat ke nikel baterai sebelum arus listrik ditembakkan.
-//    vTaskDelay(pdMS_TO_TICKS(SETTLING_TIME_MS));
+    vTaskDelay(pdMS_TO_TICKS(SETTLING_TIME_MS));
 
     // ==========================================================
     // 3. PERFORM LAS (TEMBAKKAN ARUS)
