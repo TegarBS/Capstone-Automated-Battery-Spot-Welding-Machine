@@ -59,10 +59,6 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define LED_Pin GPIO_PIN_13
 #define LED_GPIO_Port GPIOC
-#define RELAY_UP_Pin GPIO_PIN_0
-#define RELAY_UP_GPIO_Port GPIOA
-#define RELAY_DOWN_Pin GPIO_PIN_1
-#define RELAY_DOWN_GPIO_Port GPIOA
 #define REED_TOP_Pin GPIO_PIN_4
 #define REED_TOP_GPIO_Port GPIOA
 #define REED_BOTTOM_Pin GPIO_PIN_5
@@ -86,6 +82,10 @@ void Error_Handler(void);
 #define DIR_Y_GPIO_Port GPIOB
 #define STEP_Y_Pin GPIO_PIN_15
 #define STEP_Y_GPIO_Port GPIOB
+#define RELAY_UP_Pin GPIO_PIN_11
+#define RELAY_UP_GPIO_Port GPIOA
+#define RELAY_DOWN_Pin GPIO_PIN_12
+#define RELAY_DOWN_GPIO_Port GPIOA
 #define DIR_Z_Pin GPIO_PIN_3
 #define DIR_Z_GPIO_Port GPIOB
 #define STEP_Z_Pin GPIO_PIN_4

@@ -179,12 +179,14 @@ void Handle_Emergency_Abort(void) {
 	isPerformHoming = false;
 	isPerformManualJog = false;
 	isPerformWeld = false;
+	isPerformPneuUp = false;
+	isPerformPneuDown = false;
 
 	isBusy = false;
     isAborted = false;
     isMachineHomed = false;
 
-    Silinder_Up();
+    //Silinder_Up();
 
     //WELD OFF ALL PIN
 
@@ -320,7 +322,10 @@ void Perform_Auto_Weld_Cycle(void) {
         motorY.setTargetPulse(Convert_mm_to_PulseY(center.y + offsetY_mm));
 
         if (!Wait_Motors_Reach_Target()) return; // Gagal / Batal
+
         isNavigating = false;
+
+        Delay_With_Watchdog(200, heartbeat_Sequencer);
 
         mesinOdo.totalJarakXmm+=center.x;
         mesinOdo.totalJarakYmm+=center.y + offsetY_mm;
@@ -335,7 +340,7 @@ void Perform_Auto_Weld_Cycle(void) {
 
         mesinOdo.totalTitikLas++;
 
-        Delay_With_Watchdog(500, heartbeat_Sequencer);
+        //Delay_With_Watchdog(500, heartbeat_Sequencer);
 
         isPerformWeld = false;
     }
