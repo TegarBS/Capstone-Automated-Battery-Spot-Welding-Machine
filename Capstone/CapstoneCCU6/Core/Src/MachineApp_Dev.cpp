@@ -268,6 +268,8 @@ void Perform_Auto_Weld_Cycle(void) {
 
 	if (isFirstWeldCycle) {
 
+		isBusy = true;
+
 		if(HAL_GPIO_ReadPin(REED_TOP_GPIO_Port, REED_TOP_Pin) != REED_TOP_ON){
 		   if (!Homing_Silinder_Z()) {
 			   isAborted = true;
@@ -451,8 +453,11 @@ bool Eksekusi_Las(void) {
     uint32_t interval_time_us = (uint32_t)eepromSettings.interval_time_ms * 1000;
     uint32_t main_pulse_weld_time_us = (uint32_t)eepromSettings.main_pulse_weld_time * 1000;
 
-    if(!Perform_Las_Double_Pulse(pre_heat_time_us, interval_time_us, main_pulse_weld_time_us)) return false;
+    //if(!Perform_Las_Double_Pulse(pre_heat_time_us, interval_time_us, main_pulse_weld_time_us)) return false;
 
+    HAL_GPIO_WritePin(WELD_PIN_GPIO_Port, WELD_PIN_Pin, GPIO_PIN_SET);
+    Delay_With_Watchdog(300, heartbeat_Sequencer);
+    HAL_GPIO_WritePin(WELD_PIN_GPIO_Port, WELD_PIN_Pin, GPIO_PIN_SET);
     // ==========================================================
     // 4. SILINDER NAIK
     // ==========================================================
