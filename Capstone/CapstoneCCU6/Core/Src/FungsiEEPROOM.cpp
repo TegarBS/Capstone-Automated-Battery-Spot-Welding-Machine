@@ -328,6 +328,6 @@ void Load_Default_Value(void){
 
     eepromSettings.pre_heat_time_ms = 2;
     eepromSettings.interval_time_ms = 5;
-    eepromSettings.main_pulse_weld_time = 10;
+    eepromSettings.main_pulse_weld_time = 100;
 
 }

@@ -25,7 +25,6 @@ void Perform_Homing_Sequence(void);
 void Perform_Auto_Weld_Cycle(void);
 void Perform_Manual_Jog(void);
 bool Eksekusi_Las(void);
-bool Perform_Las_Double_Pulse(uint32_t pre_heat_us, uint32_t jeda_us, uint32_t main_weld_us);
 
 StepperMotor motorX(STEP_X_GPIO_Port, STEP_X_Pin, DIR_X_GPIO_Port, DIR_X_Pin, &htim2);
 StepperMotor motorY(STEP_Y_GPIO_Port, STEP_Y_Pin, DIR_Y_GPIO_Port, DIR_Y_Pin, &htim3);
@@ -71,6 +70,13 @@ void MachineApp_Loop(void) {}
 
 void Task_Sequencer(void *pvParameters) {
 	Delay_With_Watchdog(500, heartbeat_Sequencer); // Jeda inisialisasi hardware
+
+	//Menyalakan mesin las mode manual
+	HAL_GPIO_WritePin(WELD_PIN_GPIO_Port, WELD_PIN_Pin, GPIO_PIN_SET);
+	Delay_With_Watchdog(500, heartbeat_Sequencer);
+	HAL_GPIO_WritePin(ENABLE_PIN_GPIO_Port, ENABLE_PIN_Pin, GPIO_PIN_SET);
+	Delay_With_Watchdog(2000, heartbeat_Sequencer);
+	HAL_GPIO_WritePin(WELD_PIN_GPIO_Port, WELD_PIN_Pin, GPIO_PIN_RESET);
 
 	//Menunggu data konfigurasi dari Task Storage
     while(!isConfigLoaded){
@@ -186,9 +192,10 @@ void Handle_Emergency_Abort(void) {
     isAborted = false;
     isMachineHomed = false;
 
-    //Silinder_Up();
+    Silinder_Up();
 
     //WELD OFF ALL PIN
+    HAL_GPIO_WritePin(WELD_PIN_GPIO_Port, WELD_PIN_Pin, GPIO_PIN_RESET);
 
     motorX.stop();
     motorY.stop();
@@ -444,20 +451,35 @@ bool Eksekusi_Las(void) {
     vTaskDelay(pdMS_TO_TICKS(SETTLING_TIME_MS));
 
     // ==========================================================
-    // 3. PERFORM LAS (TEMBAKKAN ARUS)
+    // 3. PERFORM LAS (PENGGANTI PEDAL)
     // ==========================================================
-//    HAL_GPIO_WritePin(WELD_PORT, WELD_PIN, GPIO_PIN_SET); // Relay/Triac ON
-//    vTaskDelay(pdMS_TO_TICKS(waktu_las_ms));              // Tunggu selama waktu las
-//    HAL_GPIO_WritePin(WELD_PORT, WELD_PIN, GPIO_PIN_RESET); // Relay/Triac OFF
-    uint32_t pre_heat_time_us = (uint32_t)eepromSettings.pre_heat_time_ms * 1000;
-    uint32_t interval_time_us = (uint32_t)eepromSettings.interval_time_ms * 1000;
-    uint32_t main_pulse_weld_time_us = (uint32_t)eepromSettings.main_pulse_weld_time * 1000;
+    uint32_t main_weld_us = (uint32_t)eepromSettings.main_pulse_weld_time * 1000;
 
-    //if(!Perform_Las_Double_Pulse(pre_heat_time_us, interval_time_us, main_pulse_weld_time_us)) return false;
+    if (main_weld_us > 0) {
+		// Kuras isi Semaphore lagi
+		xSemaphoreTake(Sem_WeldDone, 0);
 
-    HAL_GPIO_WritePin(WELD_PIN_GPIO_Port, WELD_PIN_Pin, GPIO_PIN_SET);
-    Delay_With_Watchdog(300, heartbeat_Sequencer);
-    HAL_GPIO_WritePin(WELD_PIN_GPIO_Port, WELD_PIN_Pin, GPIO_PIN_SET);
+		__HAL_TIM_SET_AUTORELOAD(&htim5, main_weld_us);
+		__HAL_TIM_SET_COUNTER(&htim5, 0);
+		HAL_GPIO_WritePin(WELD_PIN_GPIO_Port, WELD_PIN_Pin, GPIO_PIN_SET);
+		HAL_TIM_Base_Start_IT(&htim5);
+
+		heartbeat_Sequencer = true;
+
+		if (xSemaphoreTake(Sem_WeldDone, pdMS_TO_TICKS((main_weld_us / 1000) + 100)) == pdTRUE) {
+			// Normal
+			heartbeat_Sequencer = true;
+		} else {
+			// FATAL ERROR
+			heartbeat_Sequencer = true;
+			HAL_GPIO_WritePin(WELD_PIN_GPIO_Port, WELD_PIN_Pin, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin(ENABLE_PIN_GPIO_Port, ENABLE_PIN_Pin, GPIO_PIN_RESET);
+			HAL_TIM_Base_Stop_IT(&htim5);
+			Set_Mesin_Error(303);
+			return false;
+		}
+    }
+
     // ==========================================================
     // 4. SILINDER NAIK
     // ==========================================================
@@ -480,85 +502,8 @@ bool Eksekusi_Las(void) {
         heartbeat_Sequencer = true;
     }
 
-    Silinder_Hold();
+    Silinder_Up();
 
     // Jika sampai di sini, siklus selesai dengan sempurna!
-    return true;
-}
-
-bool Perform_Las_Double_Pulse(uint32_t pre_heat_us, uint32_t jeda_us, uint32_t main_weld_us) {
-
-    // 0. REFRESH WATCHDOG
-    heartbeat_Sequencer = true;
-
-    // Buka gerbang keamanan utama
-    HAL_GPIO_WritePin(ENABLE_PIN_GPIO_Port, ENABLE_PIN_Pin, GPIO_PIN_SET);
-
-    // ==========================================
-    // TAHAP 1: PRE-HEAT PULSE
-    // ==========================================
-    if (pre_heat_us > 0) {
-        // Kuras isi Semaphore jika ada sisa dari interupsi sebelumnya
-        xSemaphoreTake(Sem_WeldDone, 0);
-
-        __HAL_TIM_SET_AUTORELOAD(&htim5, pre_heat_us);
-        __HAL_TIM_SET_COUNTER(&htim5, 0);
-        HAL_GPIO_WritePin(WELD_PIN_GPIO_Port, WELD_PIN_Pin, GPIO_PIN_SET);
-        HAL_TIM_Base_Start_IT(&htim5);
-
-        // PERBAIKAN BUG TIMEOUT: + 10 milidetik saja!
-        if (xSemaphoreTake(Sem_WeldDone, pdMS_TO_TICKS((pre_heat_us / 1000) + 10)) == pdTRUE) {
-            // Normal
-            heartbeat_Sequencer = true;
-        } else {
-            // FATAL ERROR
-            heartbeat_Sequencer = true;
-            HAL_GPIO_WritePin(WELD_PIN_GPIO_Port, WELD_PIN_Pin, GPIO_PIN_RESET);
-            HAL_GPIO_WritePin(ENABLE_PIN_GPIO_Port, ENABLE_PIN_Pin, GPIO_PIN_RESET);
-            HAL_TIM_Base_Stop_IT(&htim5);
-            Set_Mesin_Error(303);
-            return false;
-        }
-    }
-
-    // ==========================================
-    // TAHAP 2: INTERVAL / JEDA (Cool Time)
-    // ==========================================
-    if (jeda_us >= 1000) {
-        // Pastikan jeda minimal 1 ms agar vTaskDelay bisa berfungsi
-        vTaskDelay(pdMS_TO_TICKS(jeda_us / 1000));
-    }
-
-    // ==========================================
-    // TAHAP 3: MAIN WELD PULSE
-    // ==========================================
-    if (main_weld_us > 0) {
-        // Kuras isi Semaphore lagi
-        xSemaphoreTake(Sem_WeldDone, 0);
-
-        __HAL_TIM_SET_AUTORELOAD(&htim5, main_weld_us);
-        __HAL_TIM_SET_COUNTER(&htim5, 0);
-        HAL_GPIO_WritePin(WELD_PIN_GPIO_Port, WELD_PIN_Pin, GPIO_PIN_SET);
-        HAL_TIM_Base_Start_IT(&htim5);
-
-        heartbeat_Sequencer = true;
-
-        // PERBAIKAN BUG TIMEOUT: + 10 milidetik saja!
-        if (xSemaphoreTake(Sem_WeldDone, pdMS_TO_TICKS((main_weld_us / 1000) + 10)) == pdTRUE) {
-            // Normal
-            heartbeat_Sequencer = true;
-        } else {
-            // FATAL ERROR
-            heartbeat_Sequencer = true;
-            HAL_GPIO_WritePin(WELD_PIN_GPIO_Port, WELD_PIN_Pin, GPIO_PIN_RESET);
-            HAL_GPIO_WritePin(ENABLE_PIN_GPIO_Port, ENABLE_PIN_Pin, GPIO_PIN_RESET);
-            HAL_TIM_Base_Stop_IT(&htim5);
-            Set_Mesin_Error(303);
-            return false;
-        }
-    }
-
-    // Tutup gerbang keamanan
-    HAL_GPIO_WritePin(ENABLE_PIN_GPIO_Port, ENABLE_PIN_Pin, GPIO_PIN_RESET);
     return true;
 }
