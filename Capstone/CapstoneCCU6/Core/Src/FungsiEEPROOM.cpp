@@ -156,10 +156,6 @@ bool Save_Settings_To_EEPROM(void) {
 
         // IC EEPROM butuh waktu fisik maksimal 5ms untuk "memanggang" 1 byte data
         vTaskDelay(pdMS_TO_TICKS(5));
-
-        // Beri napas buatan pada Watchdog yang ketat (150ms)
-        //heartbeat_Sequencer = true;
-        // Jika pakai HAL IWDG langsung: HAL_IWDG_Refresh(&hiwdg);
     }
 
     return true; // Sukses menyimpan tanpa mereset mesin!
@@ -326,8 +322,8 @@ void Load_Default_Value(void){
 
     eepromSettings.time_out_pneumatic_ms = 2000;
 
-    eepromSettings.pre_heat_time_ms = 2;
-    eepromSettings.interval_time_ms = 5;
+    eepromSettings.RESERVED_pre_heat_time_ms = 2;
+    eepromSettings.RESERVED_interval_time_ms = 5;
     eepromSettings.main_pulse_weld_time = 100;
 
 }

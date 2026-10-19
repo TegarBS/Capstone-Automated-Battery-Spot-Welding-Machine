@@ -472,7 +472,8 @@ void Function_Code_03_READ_HOLDING_REGISTER(uint8_t* rxBufferInput, uint8_t len)
 // FUNC 0x04: READ INPUT REGISTERS
 // -----------------------------------------------------
 void Function_Code_04_READ_INPUT_REGISTER(uint8_t* rxBufferInput, uint8_t len) {
-    uint16_t start_addr = (rxBufferInput[2] << 8) | rxBufferInput[3];
+    uint16_t start_addr_100 = (rxBufferInput[2] << 8) | rxBufferInput[3];
+    uint16_t start_addr = start_addr_100 - 100;
     uint16_t quantity   = (rxBufferInput[4] << 8) | rxBufferInput[5];
 
     // Asumsi TOTAL_INPUT_REGISTERS didefinisikan sebagai macro (misal: 10)

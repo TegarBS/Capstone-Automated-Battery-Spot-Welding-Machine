@@ -88,8 +88,8 @@ typedef struct __attribute__((aligned(4))){
 
     uint16_t time_out_pneumatic_ms;
 
-    uint16_t pre_heat_time_ms;
-    uint16_t interval_time_ms;
+    uint16_t RESERVED_pre_heat_time_ms;
+    uint16_t RESERVED_interval_time_ms;
     uint16_t main_pulse_weld_time;
 
 } PermanentSettings_t;

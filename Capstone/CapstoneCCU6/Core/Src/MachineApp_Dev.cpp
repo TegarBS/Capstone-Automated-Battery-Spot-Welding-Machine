@@ -30,11 +30,8 @@ StepperMotor motorX(STEP_X_GPIO_Port, STEP_X_Pin, DIR_X_GPIO_Port, DIR_X_Pin, &h
 StepperMotor motorY(STEP_Y_GPIO_Port, STEP_Y_Pin, DIR_Y_GPIO_Port, DIR_Y_Pin, &htim3);
 StepperMotor motorZ(STEP_Z_GPIO_Port, STEP_Z_Pin, DIR_Z_GPIO_Port, DIR_Z_Pin, &htim4);
 
-// --- FUNGSI INISIALISASI MESIN ---
 void MachineApp_Init(void) {
-	// -----------------------------------------------------
 	// DIAGNOSTIK PENYEBAB RESET (PRE-FLIGHT CHECK)
-	// -----------------------------------------------------
 	// 1. Cek apakah mesin baru saja di-reset oleh Watchdog
 	if (__HAL_RCC_GET_FLAG(RCC_FLAG_IWDGRST)) {
 		kode_alarm_sistem = 1; // Set alarm IWDG!
@@ -48,8 +45,7 @@ void MachineApp_Init(void) {
 		kode_alarm_sistem = 3;
 	}
 
-	// WAJIB DILAKUKAN: Hapus bendera reset di memori hardware,
-	// jika tidak, status IWDG akan terus terbaca di reset berikutnya!
+	//Hapus bendera reset di memori hardware,
 	__HAL_RCC_CLEAR_RESET_FLAGS();
 
     // Buat Semaphore & Queue
@@ -104,10 +100,8 @@ void Task_Sequencer(void *pvParameters) {
         }
         else if (isPerformWeld && !isAutoWeldActive && !isNavigating) {
     		if (!Eksekusi_Las()) {
-    			// TERJADI ERROR PNEUMATIK!
     			isAborted = true;
-    			continue;             // Hentikan seluruh mesin
-    			//Kirim_Pesan_Error_Ke_HMI();   // Beritahu layar Haiwell
+    			continue;
     		}
     		isPerformWeld = false;
     		isBusy = false;
@@ -368,7 +362,6 @@ void Perform_Auto_Weld_Cycle(void) {
 		}
 
 	} else {
-
 		// ---------------------------------------------------
 		// BARIS GANJIL (1, 3, 5...): Mesin bergerak Kanan -> Kiri
 		// ---------------------------------------------------
@@ -417,20 +410,17 @@ void Perform_Manual_Jog(void) {
 
 bool Eksekusi_Las(void) {
 	uint32_t startTime;
-    // ==========================================================
-    // 1. SILINDER TURUN
-    // ==========================================================
+
     Silinder_Down();
     startTime = HAL_GetTick();
 
     if (isAborted) return false;
 
-    // ==========================================================
-    // 2. MENUNGGU REED SWITCH BAWAH TERSENTUH
-    // ==========================================================
+
+    // MENUNGGU REED SWITCH BAWAH TERSENTUH
+
     while (HAL_GPIO_ReadPin(REED_BOTTOM_GPIO_Port, REED_BOTTOM_Pin) != REED_BOTTOM_ON) {
 
-        // Tidurkan Task 1 milidetik agar CPU bisa mengurus komunikasi HMI & Task Lain
         vTaskDelay(pdMS_TO_TICKS(1));
 
         // Pengecekan Timeout (Jika macet lebih dari 2 detik)
@@ -440,19 +430,16 @@ bool Eksekusi_Las(void) {
             return false;
         }
 
-        // Tendang Watchdog agar tidak reset saat menunggu
+
         heartbeat_Sequencer = true;
     }
 
     if (isAborted) return false;
 
-    // [TIPS INDUSTRI]: Beri jeda sedikit setelah sensor tersentuh agar
-    // tekanan pneumatik benar-benar padat ke nikel baterai sebelum arus listrik ditembakkan.
     vTaskDelay(pdMS_TO_TICKS(SETTLING_TIME_MS));
 
-    // ==========================================================
-    // 3. PERFORM LAS (PENGGANTI PEDAL)
-    // ==========================================================
+    // PERFORM LAS (PENGGANTI PEDAL)
+
     uint32_t main_weld_us = (uint32_t)eepromSettings.main_pulse_weld_time * 1000;
 
     if (main_weld_us > 0) {
@@ -480,21 +467,17 @@ bool Eksekusi_Las(void) {
 		}
     }
 
-    // ==========================================================
-    // 4. SILINDER NAIK
-    // ==========================================================
+    // SILINDER NAIK
     Silinder_Up();
     startTime = HAL_GetTick();
 
-    // ==========================================================
-    // 5. MENUNGGU REED SWITCH ATAS TERSENTUH (POSISI AMAN)
-    // ==========================================================
+    // MENUNGGU REED SWITCH ATAS TERSENTUH (POSISI AMAN)
+
     while (HAL_GPIO_ReadPin(REED_TOP_GPIO_Port, REED_TOP_Pin) != REED_TOP_ON) {
 
         vTaskDelay(pdMS_TO_TICKS(1));
 
         if ((HAL_GetTick() - startTime) > eepromSettings.time_out_pneumatic_ms) {
-            //kode_alarm_sistem = 102; // Contoh: Error Silinder Gagal Naik
         	Set_Mesin_Error(301);
             return false; // Berhenti dan lapor error
         }
