@@ -65,7 +65,7 @@ void MachineApp_Init(void) {
 void MachineApp_Loop(void) {}
 
 void Task_Sequencer(void *pvParameters) {
-	Delay_With_Watchdog(500, heartbeat_Sequencer); // Jeda inisialisasi hardware
+	Delay_With_Watchdog(1000, heartbeat_Sequencer); // Jeda inisialisasi hardware
 
 	//Menyalakan mesin las mode manual
 	HAL_GPIO_WritePin(WELD_PIN_GPIO_Port, WELD_PIN_Pin, GPIO_PIN_SET);
