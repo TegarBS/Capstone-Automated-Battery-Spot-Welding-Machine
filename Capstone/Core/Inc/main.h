@@ -73,6 +73,7 @@ void Error_Handler(void);
 #define LIMIT_Y_EXTI_IRQn EXTI1_IRQn
 #define LIMIT_Z_Pin GPIO_PIN_10
 #define LIMIT_Z_GPIO_Port GPIOB
+#define LIMIT_Z_EXTI_IRQn EXTI15_10_IRQn
 #define DIR_X_Pin GPIO_PIN_12
 #define DIR_X_GPIO_Port GPIOB
 #define STEP_X_Pin GPIO_PIN_13

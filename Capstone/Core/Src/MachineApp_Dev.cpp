@@ -15,7 +15,7 @@
 #include "FungsiEEPROM.h"
 #include "Monitor.h"
 
-#define SETTLING_TIME_MS 100
+#define SETTLING_TIME_MS 500
 
 void Task_Sequencer(void *pvParameters);
 
@@ -229,6 +229,7 @@ void Perform_Homing_Sequence(void) {
     isNavigating = true;
     motorX.isHomed = false;
     motorY.isHomed = false;
+    motorZ.isHomed = false;
 
     if (HAL_GPIO_ReadPin(LIMIT_X_GPIO_Port, LIMIT_X_Pin) == LIMIT_X_Pressed) motorX.stop();
     else motorX.setTargetPulse(-999999);
@@ -236,23 +237,29 @@ void Perform_Homing_Sequence(void) {
     if (HAL_GPIO_ReadPin(LIMIT_Y_GPIO_Port, LIMIT_Y_Pin) == LIMIT_Y_Pressed) motorY.stop();
     else motorY.setTargetPulse(-999999);
 
-    if (!Wait_Motors_Reach_Target()) return;
+    if (HAL_GPIO_ReadPin(LIMIT_Z_GPIO_Port, LIMIT_Z_Pin) == LIMIT_Z_Pressed) motorZ.stop();
+    else motorZ.setTargetPulse(-999999);
+
+    if (!Wait_Motors_Reach_Target(true)) return;
 
     motorX.resetPosition();
     motorY.resetPosition();
+    motorZ.resetPosition();
 
     // --- TAHAP 2: PULL-OFF ---
     ignoreLimitSwitch = true;
     motorX.setTargetPulse(Convert_mm_to_PulseX(eepromSettings.homingTravelAfterLimitX));
     motorY.setTargetPulse(Convert_mm_to_PulseY(eepromSettings.homingTravelAfterLimitY));
+    motorZ.setTargetPulse(Convert_mm_to_PulseZ(eepromSettings.homingTravelAfterLimitZ));
 
-    if (!Wait_Motors_Reach_Target()) return;
+    if (!Wait_Motors_Reach_Target(true)) return;
 
     ignoreLimitSwitch = false;
 
     // --- TAHAP 3: ZERO ABSOLUT ---
     motorX.resetPosition();
     motorY.resetPosition();
+    motorZ.resetPosition();
     Update_Motor_Param_From_Settings();
 
     isMachineHomed = true;
@@ -436,7 +443,7 @@ bool Eksekusi_Las(void) {
 
     if (isAborted) return false;
 
-    vTaskDelay(pdMS_TO_TICKS(SETTLING_TIME_MS));
+    Delay_With_Watchdog(SETTLING_TIME_MS,heartbeat_Sequencer);
 
     // PERFORM LAS (PENGGANTI PEDAL)
 

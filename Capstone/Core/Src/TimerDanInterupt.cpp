@@ -106,7 +106,7 @@ extern "C" void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 		// PASTIKAN KEDUA MOTOR SUDAH BERHENTI
 		// Jika mesin homing diagonal, X mungkin nabrak duluan sementara Y masih jalan.
 		// Kita baru boleh membangunkan RTOS jika keduanya sudah benar-benar stop.
-		if (!motorX.isMoving() && !motorY.isMoving()) {
+		if (!motorX.isMoving() && !motorY.isMoving() && !motorZ.isMoving()) {
 
 			isNavigating = false; // Matikan bendera
 
