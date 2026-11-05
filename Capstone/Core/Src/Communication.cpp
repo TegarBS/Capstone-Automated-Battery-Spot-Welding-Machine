@@ -60,8 +60,9 @@ enum ModbusDiscreteInput {
     DI_LIMIT_SWITCH_Z   = 0x0002,
 	DI_IS_MACHINE_HOMED = 0x0003,
 	DI_IS_MACHINE_RUN   = 0x0004,
-	DI_REED_TOP			= 0x0005,
-	DI_REED_BOTTOM		= 0x0006,
+	//DI_REED_TOP			= 0x0005,
+	//DI_REED_BOTTOM		= 0x0006,
+	DI_IS_NAVIGATING    = 0x0005
 
 };
 
@@ -414,11 +415,14 @@ bool Baca_Discrete_Input(uint16_t input_addr) {
         case DI_IS_MACHINE_RUN:
         	return HAL_GPIO_ReadPin(LED_GPIO_Port, LED_Pin) == GPIO_PIN_SET;
 
-        case DI_REED_TOP:
-        	return HAL_GPIO_ReadPin(REED_TOP_GPIO_Port, REED_TOP_Pin) == REED_TOP_ON;
+//        case DI_REED_TOP:
+//        	return HAL_GPIO_ReadPin(REED_TOP_GPIO_Port, REED_TOP_Pin) == REED_TOP_ON;
+//
+//        case DI_REED_BOTTOM:
+//        	return HAL_GPIO_ReadPin(REED_BOTTOM_GPIO_Port, REED_BOTTOM_Pin) == REED_BOTTOM_ON;
 
-        case DI_REED_BOTTOM:
-        	return HAL_GPIO_ReadPin(REED_BOTTOM_GPIO_Port, REED_BOTTOM_Pin) == REED_BOTTOM_ON;
+        case DI_IS_NAVIGATING:
+        	return isNavigating;
 
         default:
             return false; // Jika alamat tidak terdaftar
