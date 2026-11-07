@@ -214,8 +214,10 @@ Seven test aspects were agreed with the project supervisor. The table lists the 
 
 ## 👥 Team
 
-- **Emir Dzacky Marcello** (I0723029): *role to be added*
-- **Tegar Bayu Segara** (I0723075): *role to be added*
+| Name | Role |
+|---|---|
+| **Emir Dzacky Marcello** | HMI design, schematic design, wiring and chassis assembly |
+| **Tegar Bayu Segara** | Firmware development, mechanical CAD design, PCB design, control panel assembly |
 
 Program Studi S1 Teknik Elektro, Fakultas Teknik, Universitas Sebelas Maret, Surakarta.
 
