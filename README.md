@@ -155,8 +155,8 @@ Seven test aspects were agreed with the project supervisor. The table lists the 
 
 | # | Aspect | Method | Pass criterion | Result |
 |---|---|---|---|---|
-| 1 | X/Y position accuracy | Command a position, measure with digital caliper, repeat ≥ 10× | Mean error ≤ ±0.3 mm | ⏳ In progress |
-| 2 | Repeatability & backlash | Approach same points from both directions, with and without firmware compensation | Repeatability ≤ ±0.2 mm | ⏳ In progress |
+| 1 | X/Y position accuracy | Command a position, measure with digital caliper, repeat ≥ 10× | Mean error ≤ ±0.3 mm | -0.1 mm |
+| 2 | Repeatability & backlash | Approach same points from both directions, with and without firmware compensation | Repeatability ≤ ±0.2 mm | -0.1 mm |
 | 3 | Weld quality | Test matrix at 5 bar; visual inspection and pull/peel test | ≥ 95% of points without burn-through or expulsion | ⏳ In progress |
 | 4 | Safety interlock | Z-Down inactive, E-stop pressed, MCU off, watchdog timeout | No weld pulse in any failure scenario | ⏳ In progress |
 | 5 | EMI immunity | Repeated welding while polling Modbus and monitoring resets | Zero spontaneous resets, CRC errors ≈ 0 | ⏳ In progress |
@@ -171,12 +171,13 @@ Seven test aspects were agreed with the project supervisor. The table lists the 
 
 ```text
 ├── Capstone/      # STM32CubeIDE project (Core, Drivers, FreeRTOS tasks, Modbus slave parser)
+├── Hardware
+|   ├── Schematic
+|   ├── PCB Render
+|   └── CAD Design
 ├── README.md
 └── LICENSE
 ```
-
-> 💡 Suggested additions: `Hardware/` (schematic, PCB Gerber, CAD), `HMI/` (Haiwell project file) and `docs/` (images, report).
-
 ---
 
 ## 🛠️ Build & Flash
