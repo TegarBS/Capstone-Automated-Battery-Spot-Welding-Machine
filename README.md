@@ -163,8 +163,6 @@ Seven test aspects were agreed with the project supervisor. The table lists the 
 | 6 | HMI communication | Write 5 parameters from the HMI and read them back | ≥ 99% successful transactions | ⏳ In progress |
 | 7 | Spot-weld resistance | Compare weld resistance with a reference nickel strip (internal resistance meter) | Close to reference, not significantly higher | ⏳ In progress |
 
-> 📌 *Add photos of test setups and weld results here (`docs/images/test-*.jpg`).*
-
 ---
 
 ## 📂 Repository Structure
@@ -209,7 +207,10 @@ Seven test aspects were agreed with the project supervisor. The table lists the 
 
 ## 📸 Gallery
 
-> 📌 *Add: front view, close-up of the Z head and bed, control box, PCB V2.0, CAD renders, welded nickel strips on cells.*
+<img width="300" height="450" alt="IMG_20261102_085327" src="https://github.com/user-attachments/assets/d41bd675-354d-4c08-b195-e12158924d46" />
+<img width="300" height="450" alt="IMG_20261105_103639" src="https://github.com/user-attachments/assets/ecf8aed8-dfcd-4c03-91a9-a07ab3473144" />
+
+
 
 ---
 
