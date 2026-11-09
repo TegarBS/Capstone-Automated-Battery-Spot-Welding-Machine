@@ -15,7 +15,7 @@
 #include "FungsiEEPROM.h"
 #include "Monitor.h"
 
-#define SETTLING_TIME_MS 500
+#define SETTLING_TIME_MS 200
 
 void Task_Sequencer(void *pvParameters);
 
