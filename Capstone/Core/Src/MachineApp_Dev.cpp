@@ -270,9 +270,14 @@ void Perform_Homing_Sequence(void) {
 
 void Perform_Auto_Weld_Cycle(void) {
 
+	isErrorSave = true;
+	errorCode = 100;
+
     if (!isMachineHomed) {
         isPerformHoming = true; return;
     }
+
+    errorCode = 101;
 
 	if (isFirstWeldCycle) {
 
@@ -302,12 +307,14 @@ void Perform_Auto_Weld_Cycle(void) {
 		}
 
 		isFirstWeldCycle = false;
+		errorCode = 102;
 	}
 
     if (indexBarisAktual >= configLas.totalBaris) {
         isAutoWeldActive = false;
         isBusy = false;
         isSaveOdo = true;
+        errorCode = 109;
         return;
     }
 
@@ -318,6 +325,8 @@ void Perform_Auto_Weld_Cycle(void) {
     if (isAborted) return;
 
     Koordinat_t center = Calculate_Battery_Center_mm();
+
+    errorCode = 103;
 
     // MINI-LOOP
     for (uint16_t i = 0; i < eepromSettings.weldCount; i++) {
@@ -332,6 +341,7 @@ void Perform_Auto_Weld_Cycle(void) {
         motorY.setTargetPulse(Convert_mm_to_PulseY(center.y + offsetY_mm));
 
         if (!Wait_Motors_Reach_Target()) return; // Gagal / Batal
+        errorCode = 104;
 
         isNavigating = false;
 
@@ -416,6 +426,7 @@ void Perform_Manual_Jog(void) {
 }
 
 bool Eksekusi_Las(void) {
+	errorCode = 300;
 	uint32_t startTime;
 
     Silinder_Down();
@@ -439,6 +450,7 @@ bool Eksekusi_Las(void) {
 
 
         heartbeat_Sequencer = true;
+        errorCode = 301;
     }
 
     if (isAborted) return false;
@@ -474,6 +486,8 @@ bool Eksekusi_Las(void) {
 		}
     }
 
+    errorCode = 302;
+
     // SILINDER NAIK
     Silinder_Up();
     startTime = HAL_GetTick();
@@ -493,6 +507,8 @@ bool Eksekusi_Las(void) {
     }
 
     Silinder_Up();
+
+    errorCode = 303;
 
     // Jika sampai di sini, siklus selesai dengan sempurna!
     return true;

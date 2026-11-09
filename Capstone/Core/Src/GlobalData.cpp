@@ -9,6 +9,8 @@
 
 volatile uint16_t errorCallback = 0;
 
+volatile uint16_t errorCode = 0;
+
 // =========================================================
 // [STRUCT PARAMETER PERMANEN (EEPROM)]
 // =========================================================
@@ -59,6 +61,8 @@ volatile bool isPerformPneuUp = false;
 volatile bool isPerformPneuDown = false;
 
 volatile bool isBusy = false;
+
+volatile bool isErrorSave = false;
 
 // =========================================================
 // [RTOS HANDLES]

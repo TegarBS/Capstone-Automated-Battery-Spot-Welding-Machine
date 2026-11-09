@@ -22,6 +22,7 @@ extern IWDG_HandleTypeDef hiwdg;
 // Kavling Memori
 #define ADDR_ODOMETER   0x0000  // Mulai dari byte 0
 #define ADDR_SETTINGS   0x0040  // Mulai dari byte 64
+#define ADDR_ERROR_LOG  0x0100
 
 #define MAX_ODO_SLOTS      5         // 32 Byte ruang / 4 Byte data = 8 Slot
 #define WEAR_LEVEL_LIMIT   100000    // Pindah slot setiap 100 ribu titik las
@@ -29,6 +30,12 @@ extern IWDG_HandleTypeDef hiwdg;
 #define MAGIC_NUMBER 0xABCD1234      // Kode rahasia penanda Flash valid
 
 #define IC_ADDRESS_SIZE I2C_MEMADD_SIZE_16BIT
+
+//================================================
+
+bool Save_Error_Log_To_EEPROM(uint16_t errCode);
+bool Load_Error_Log_From_EEPROM(void);
+
 
 void Task_Storage(void *pvParameters) {
 	vTaskDelay(pdMS_TO_TICKS(100));
@@ -50,6 +57,8 @@ void Task_Storage(void *pvParameters) {
 		Set_Mesin_Error(102);
 		Load_Default_Value(); // Beri nilai aman agar mesin tidak HardFault
 	}
+
+	Load_Error_Log_From_EEPROM();
 
 	Salin_Data_Ke_Register();
 	Update_Motor_Param_From_Settings();
@@ -88,6 +97,9 @@ void Task_Storage(void *pvParameters) {
         	}
 
         	isSaveOdo = false;
+        }else if(isErrorSave){
+        	Save_Error_Log_To_EEPROM(errorCode);
+        	isErrorSave = false;
         }
     }
 }
@@ -326,4 +338,44 @@ void Load_Default_Value(void){
     eepromSettings.RESERVED_interval_time_ms = 5;
     eepromSettings.main_pulse_weld_time = 100;
 
+}
+
+bool Save_Error_Log_To_EEPROM(uint16_t errCode) {
+    // Tulis langsung data uint16_t (2 byte) ke alamat ADDR_ERROR_LOG
+
+	Holding_Registers[64] = errCode;
+    HAL_StatusTypeDef status = HAL_I2C_Mem_Write(
+        &hi2c1, EEPROM_I2C_ADDR,
+        ADDR_ERROR_LOG, I2C_MEMADD_SIZE_16BIT,
+        (uint8_t*)&errCode, sizeof(uint16_t), 50
+    );
+
+    if (status != HAL_OK) {
+        return false; // Gagal I2C
+    }
+
+    return true;
+}
+
+bool Load_Error_Log_From_EEPROM(void) {
+    uint16_t errCode = 0;
+
+    HAL_StatusTypeDef status = HAL_I2C_Mem_Read(
+        &hi2c1, EEPROM_I2C_ADDR,
+        ADDR_ERROR_LOG, I2C_MEMADD_SIZE_16BIT,
+        (uint8_t*)&errCode, sizeof(uint16_t), 100
+    );
+
+    if (status == HAL_OK) {
+        // Validasi data (bukan 0 atau 0xFFFF bawaan pabrik)
+        if (errCode != 0xFFFF && errCode != 0) {
+            Holding_Registers[79] = errCode;
+        } else {
+            Holding_Registers[79] = 0; // Normal
+        }
+    } else {
+        Holding_Registers[79] = 0;
+    }
+
+    return true;
 }

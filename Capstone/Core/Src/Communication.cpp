@@ -113,11 +113,8 @@ void Task_Komunikasi(void *pvParameters) {
 
     while(1) {
         if (xSemaphoreTake(Sem_DataDiterima, pdMS_TO_TICKS(50)) == pdTRUE) {
+        	errorCode = 200;
 
-        	// ----------------------------------------------------
-			// CEK APAKAH INI KEBANGUN KARENA ERROR?
-			// (Jika rxIndex = 0, berarti dibangunkan oleh ErrorCallback)
-			// ----------------------------------------------------
 			if (rxIndex == 0) {
 				// Jeda 15 milidetik (Biarkan gelombang data HMI lewat dulu)
 				HAL_UART_DeInit(&huart1);
@@ -152,30 +149,37 @@ void Task_Komunikasi(void *pvParameters) {
             // 3. Modbus Function Router
             switch (function_code) {
 				case READ_COIL:
+					errorCode = 201;
 					Function_Code_01_READ_COILS(rxBuffer, len);
 					break;
 
 				case READ_DISCRETE_INPUT:
+					errorCode = 202;
 					Function_Code_02_READ_DISCRETE_INPUT(rxBuffer, len);
 					break;
 
 				case READ_HOLDING_REGISTER:
+					errorCode = 203;
 					Function_Code_03_READ_HOLDING_REGISTER(rxBuffer, len);
 					break;
 
 				case READ_INPUT_REGISTER:
+					errorCode = 204;
 					Function_Code_04_READ_INPUT_REGISTER(rxBuffer, len);
 					break;
 
                 case WRITE_SINGLE_COIL:
+                	errorCode = 205;
                 	Function_Code_05_WRITE_SINGLE_COIL(rxBuffer, len);
                     break;
 
                 case WRITE_SINGLE_REGISTER:
+                	errorCode = 206;
                 	Function_Code_06_WRITE_SINGLE_REGISTER(rxBuffer, len);
                     break;
 
                 default:
+                	errorCode = 207;
                     Send_Modbus_Exception(rxBuffer[0], function_code, MODBUS_EXCEPTION_ILLEGAL_FUNCTION);
                     break;
             }

@@ -13,6 +13,9 @@
  * Blinking LED untuk monitor kondisi STM32
  *
  */
+
+uint32_t lastTick = 0;
+
 void Task_Monitor(void *pvParameters) {
 
 	for(uint32_t t = 0; t < 200; t += 10) {
@@ -21,9 +24,9 @@ void Task_Monitor(void *pvParameters) {
 	}
 
 	uint32_t counter_led = 0;
+	lastTick = HAL_GetTick();   // TAMBAHAN 1: titik awal hitung
 
     while(1) {
-
 
     	if (heartbeat_Sequencer == true && heartbeat_Komunikasi == true) {
 
@@ -32,7 +35,7 @@ void Task_Monitor(void *pvParameters) {
 
 	        // --- 2. KEDIP LED INDIKATOR SISTEM SEHAT ---
 	        counter_led++;
-	        // Task berjalan tiap 100ms. 100ms x 10 = 1000ms (1 Detik)
+
 	        if (counter_led >= 10) {
 	            HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 	            counter_led = 0;
@@ -42,17 +45,19 @@ void Task_Monitor(void *pvParameters) {
 			heartbeat_Sequencer = false;
 			heartbeat_Komunikasi = false;
 
+			lastTick = HAL_GetTick();   // TAMBAHAN 2: catat waktu blok ini dieksekusi
+			isErrorSave = false;        // (opsional, sesuai komentar Anda: normal kembali)
 		}
+
+    	// TAMBAHAN 3: blok di atas belum dieksekusi selama 100 ms
+    	if ((HAL_GetTick() - lastTick) >= 100) {
+    		isErrorSave = true;
+    	}
 
         // --- 1. UPDATE REGISTER MODBUS (MONITORING POSISI) ---
 		int32_t currentX_pulse = motorX.getCurrentPositionPulse();
 		int32_t currentY_pulse = motorY.getCurrentPositionPulse();
 		int32_t currentZ_pulse = motorZ.getCurrentPositionPulse();
-
-		// KONVERSI KE MILIMETER DENGAN PRESISI x100
-		// Rumus: (Pulse * 100) / Steps_per_mm
-		// Jika stepsPerMm bernilai 0, langsung jadikan hasilnya 0.
-		// Jika tidak 0, baru lakukan operasi pembagian.
 
 		int32_t currentX_mm = (eepromSettings.stepsPerMmX == 0) ? 0 : ((currentX_pulse * 100) / eepromSettings.stepsPerMmX);
 		int32_t currentY_mm = (eepromSettings.stepsPerMmY == 0) ? 0 : ((currentY_pulse * 100) / eepromSettings.stepsPerMmY);

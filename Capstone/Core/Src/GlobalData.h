@@ -29,6 +29,8 @@
 
 extern volatile uint16_t errorCallback;
 
+extern volatile uint16_t errorCode;
+
 // =========================================================
 // [STRUCT PARAMETER PERMANEN (EEPROM) DAN ODOMETER]
 // =========================================================
@@ -153,6 +155,7 @@ extern volatile bool isPerformPneuDown;
 
 extern volatile bool isBusy;
 
+extern volatile bool isErrorSave;
 // =========================================================
 // [RTOS HANDLES]
 // =========================================================
