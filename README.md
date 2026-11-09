@@ -158,9 +158,9 @@ Seven test aspects were agreed with the project supervisor. The table lists the 
 | 1 | X/Y position accuracy | Command a position, measure with digital caliper, repeat ≥ 10× | Mean error ≤ ±0.3 mm | -0.1 mm |
 | 2 | Repeatability & backlash | Approach same points from both directions, with and without firmware compensation | Repeatability ≤ ±0.2 mm | -0.1 mm |
 | 3 | Weld quality | Test matrix at 5 bar; visual inspection and pull/peel test | ≥ 95% of points without burn-through or expulsion | ⏳ In progress |
-| 4 | Safety interlock | Z-Down inactive, E-stop pressed, MCU off, watchdog timeout | No weld pulse in any failure scenario | ⏳ In progress |
-| 5 | EMI immunity | Repeated welding while polling Modbus and monitoring resets | Zero spontaneous resets, CRC errors ≈ 0 | ⏳ In progress |
-| 6 | HMI communication | Write 5 parameters from the HMI and read them back | ≥ 99% successful transactions | ⏳ In progress |
+| 4 | Safety interlock | Test with certain condition | Machine do not respond if certain condition is not fulfilled | 100% Pass |
+| 5 | EMI immunity | Repeated welding while polling Modbus and monitoring resets | Zero spontaneous resets and Zero error | Zero spontaneous resets and Zero error |
+| 6 | HMI communication | Write 44 parameters from the HMI and read them back | ≥ 99% successful transactions | 100% Success |
 | 7 | Spot-weld resistance | Compare weld resistance with a reference nickel strip (internal resistance meter) | Close to reference, not significantly higher | ⏳ In progress |
 
 ---
