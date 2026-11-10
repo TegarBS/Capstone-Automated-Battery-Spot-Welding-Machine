@@ -157,11 +157,11 @@ Seven test aspects were agreed with the project supervisor. The table lists the 
 |---|---|---|---|---|
 | 1 | X/Y position accuracy | Command a position, measure with digital caliper, repeat ≥ 10× | Mean error ≤ ±0.3 mm | -0.1 mm |
 | 2 | Repeatability & backlash | Approach same points from both directions, with and without firmware compensation | Repeatability ≤ ±0.2 mm | -0.1 mm |
-| 3 | Weld quality | Test matrix at 5 bar; visual inspection and pull/peel test | ≥ 95% of points without burn-through or expulsion | ⏳ In progress |
+| 3 | Weld quality | Test matrix at 5 bar; visual inspection and pull/peel test | ≥ 95% of points without burn-through or expulsion | Good No Burnout |
 | 4 | Safety interlock | Test with certain condition | Machine do not respond if certain condition is not fulfilled | 100% Pass |
 | 5 | EMI immunity | Repeated welding while polling Modbus and monitoring resets | Zero spontaneous resets and Zero error | Zero spontaneous resets and Zero error |
 | 6 | HMI communication | Write 44 parameters from the HMI and read them back | ≥ 99% successful transactions | 100% Success |
-| 7 | Spot-weld resistance | Compare weld resistance with a reference nickel strip (internal resistance meter) | Close to reference, not significantly higher | ⏳ In progress |
+| 7 | Spot-weld resistance | Battery Internal Resistance | <10mΩ | 3.303mΩ |
 
 ---
 
@@ -207,10 +207,10 @@ Seven test aspects were agreed with the project supervisor. The table lists the 
 
 ## 📸 Gallery
 
-<img width="300" height="450" alt="IMG_20261102_085327" src="https://github.com/user-attachments/assets/d41bd675-354d-4c08-b195-e12158924d46" />
-<img width="300" height="450" alt="IMG_20261105_103639" src="https://github.com/user-attachments/assets/ecf8aed8-dfcd-4c03-91a9-a07ab3473144" />
-
-
+<img width="300" height="450" alt="Control Panel" src="https://github.com/user-attachments/assets/d41bd675-354d-4c08-b195-e12158924d46" />
+<img width="300" height="450" alt="Head" src="https://github.com/user-attachments/assets/ecf8aed8-dfcd-4c03-91a9-a07ab3473144" />
+<img width="300" height="450" alt="Result" src="https://github.com/user-attachments/assets/3099901c-46b0-477c-bcf3-b784db86bf43" />
+<img width="300" height="450" alt="Action" src="https://github.com/user-attachments/assets/a54c6ef0-13c4-4010-a92d-f9b22bed661b" />
 
 ---
 
