@@ -400,13 +400,17 @@ void Perform_Manual_Jog(void) {
 	int16_t jogManY_mm = (int16_t)Holding_Registers[8];
 	int16_t jogManZ_mm = (int16_t)Holding_Registers[10];
 
-	int32_t targetAbsX = motorX.getCurrentPositionPulse() + Convert_mm_to_PulseX(jogManX_mm);
-	int32_t targetAbsY = motorY.getCurrentPositionPulse() + Convert_mm_to_PulseY(jogManY_mm);
-	int32_t targetAbsZ = motorZ.getCurrentPositionPulse() + Convert_mm_to_PulseZ(jogManZ_mm);
+	float jogManX_mm_float = jogManX_mm / 10.0f;
+	float jogManY_mm_float = jogManY_mm / 10.0f;
+	float jogManZ_mm_float = jogManZ_mm / 10.0f;
+
+	int32_t targetAbsX = motorX.getCurrentPositionPulse() + Convert_mm_to_PulseX(jogManX_mm_float);
+	int32_t targetAbsY = motorY.getCurrentPositionPulse() + Convert_mm_to_PulseY(jogManY_mm_float);
+	int32_t targetAbsZ = motorZ.getCurrentPositionPulse() + Convert_mm_to_PulseZ(jogManZ_mm_float);
 
 	if(targetAbsX > Convert_mm_to_PulseX(eepromSettings.maxTravelX)) Set_Mesin_Error(206);
-	if(targetAbsY > Convert_mm_to_PulseX(eepromSettings.maxTravelY)) Set_Mesin_Error(207);
-	if(targetAbsZ > Convert_mm_to_PulseX(eepromSettings.maxTravelZ)) Set_Mesin_Error(208);
+	if(targetAbsY > Convert_mm_to_PulseY(eepromSettings.maxTravelY)) Set_Mesin_Error(207);
+	if(targetAbsZ > Convert_mm_to_PulseZ(eepromSettings.maxTravelZ)) Set_Mesin_Error(208);
 
     isNavigating = true;
     motorX.setTargetPulse(targetAbsX);
@@ -485,6 +489,8 @@ bool Eksekusi_Las(void) {
 			return false;
 		}
     }
+
+    Delay_With_Watchdog(SETTLING_TIME_MS/2,heartbeat_Sequencer);
 
     errorCode = 302;
 
