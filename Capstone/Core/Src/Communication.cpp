@@ -657,7 +657,7 @@ void Function_Code_05_WRITE_SINGLE_COIL(uint8_t* rxBufferInput, uint8_t len) {
 
         case COIL_POWER_WELDER:
             if (coil_val == MODBUS_COIL_ON) {
-            	if (isBusy){
+            	if (isBusy || isWelderON){
             		Send_Modbus_Exception(rxBufferInput[0], 0x05, MODBUS_EXCEPTION_BUSY);
     				send_echo = false; // Batal kirim ACK
     				break;             // Langsung lompat keluar dari blok case ini

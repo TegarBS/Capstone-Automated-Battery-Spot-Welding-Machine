@@ -94,7 +94,26 @@ void NMI_Handler(void)
 void HardFault_Handler(void)
 {
   /* USER CODE BEGIN HardFault_IRQn 0 */
+	WELD_PIN_GPIO_Port->BSRR = (uint32_t)WELD_PIN_Pin << 16U;
+	ENABLE_PIN_GPIO_Port->BSRR = (uint32_t)ENABLE_PIN_Pin << 16U;
 
+	TIM2->CR1 &= ~TIM_CR1_CEN;
+	TIM2->DIER &= ~TIM_DIER_UIE;
+	TIM2->SR &= ~TIM_SR_UIF;
+
+	TIM3->CR1 &= ~TIM_CR1_CEN;
+	TIM3->DIER &= ~TIM_DIER_UIE;
+	TIM3->SR &= ~TIM_SR_UIF;
+
+	TIM4->CR1 &= ~TIM_CR1_CEN;
+	TIM4->DIER &= ~TIM_DIER_UIE;
+	TIM4->SR &= ~TIM_SR_UIF;
+
+	TIM5->CR1 &= ~TIM_CR1_CEN;
+	TIM5->DIER &= ~TIM_DIER_UIE;
+	TIM5->SR &= ~TIM_SR_UIF;
+
+	NVIC_SystemReset();
   /* USER CODE END HardFault_IRQn 0 */
   while (1)
   {

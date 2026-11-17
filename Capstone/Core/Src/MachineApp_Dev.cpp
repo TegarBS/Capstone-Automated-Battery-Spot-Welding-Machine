@@ -488,6 +488,7 @@ bool Eksekusi_Las(void) {
     Delay_With_Watchdog(SETTLING_TIME_MS,heartbeat_Sequencer);
 
     // PERFORM LAS (PENGGANTI PEDAL)
+    if (isAborted) return false;
 
     uint32_t main_weld_us = (uint32_t)eepromSettings.main_pulse_weld_time * 1000;
 
@@ -512,6 +513,7 @@ bool Eksekusi_Las(void) {
 			HAL_GPIO_WritePin(ENABLE_PIN_GPIO_Port, ENABLE_PIN_Pin, GPIO_PIN_RESET);
 			HAL_TIM_Base_Stop_IT(&htim5);
 			Set_Mesin_Error(303);
+			isWelderON = false;
 			return false;
 		}
     }
@@ -538,7 +540,7 @@ bool Eksekusi_Las(void) {
         heartbeat_Sequencer = true;
     }
 
-    Silinder_Up();
+    Silinder_Hold();
 
     errorCode = 303;
 
