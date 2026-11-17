@@ -61,6 +61,8 @@ volatile bool isPerformPneuUp = false;
 volatile bool isPerformPneuDown = false;
 
 volatile bool isBusy = false;
+volatile bool isWelderON = false;
+volatile bool isCMDWelderON = false;
 
 volatile bool isErrorSave = false;
 

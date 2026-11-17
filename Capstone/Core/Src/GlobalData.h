@@ -154,6 +154,8 @@ extern volatile bool isPerformPneuUp;
 extern volatile bool isPerformPneuDown;
 
 extern volatile bool isBusy;
+extern volatile bool isWelderON;
+extern volatile bool isCMDWelderON;
 
 extern volatile bool isErrorSave;
 // =========================================================

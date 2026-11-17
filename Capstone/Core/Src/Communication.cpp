@@ -35,6 +35,7 @@ enum ModbusCoilAddress {
 	COIL_MANUAL_WELD     = 0x0005,
 	COIL_PNEU_UP         = 0x0006,
 	COIL_PNEU_DOWN       = 0x0007,
+	COIL_POWER_WELDER    = 0x0008,
 
     COIL_SAVE_TO_FLASH   = 0x000A,
     COIL_RESET_SYSTEM    = 0x000B,
@@ -337,6 +338,9 @@ bool Baca_Status_Coil(uint16_t coil_addr) {
 
         case COIL_PNEU_DOWN:
         	return isPerformPneuDown;
+
+        case COIL_POWER_WELDER:
+            return isWelderON;
 
         default:
             return false;
@@ -649,6 +653,18 @@ void Function_Code_05_WRITE_SINGLE_COIL(uint8_t* rxBufferInput, uint8_t len) {
 				break;             // Langsung lompat keluar dari blok case ini
         	}
             isPerformPneuDown = (coil_val == MODBUS_COIL_ON);
+            break;
+
+        case COIL_POWER_WELDER:
+            if (coil_val == MODBUS_COIL_ON) {
+            	if (isBusy){
+            		Send_Modbus_Exception(rxBufferInput[0], 0x05, MODBUS_EXCEPTION_BUSY);
+    				send_echo = false; // Batal kirim ACK
+    				break;             // Langsung lompat keluar dari blok case ini
+            	}
+
+            	isCMDWelderON = true;
+            }
             break;
 
         default:

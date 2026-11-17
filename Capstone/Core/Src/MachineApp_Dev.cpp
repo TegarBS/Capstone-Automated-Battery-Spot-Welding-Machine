@@ -67,23 +67,20 @@ void MachineApp_Loop(void) {}
 void Task_Sequencer(void *pvParameters) {
 	Delay_With_Watchdog(1000, heartbeat_Sequencer); // Jeda inisialisasi hardware
 
-	//Menyalakan mesin las mode manual
-	HAL_GPIO_WritePin(WELD_PIN_GPIO_Port, WELD_PIN_Pin, GPIO_PIN_SET);
-	Delay_With_Watchdog(500, heartbeat_Sequencer);
-	HAL_GPIO_WritePin(ENABLE_PIN_GPIO_Port, ENABLE_PIN_Pin, GPIO_PIN_SET);
-	Delay_With_Watchdog(2000, heartbeat_Sequencer);
-	HAL_GPIO_WritePin(WELD_PIN_GPIO_Port, WELD_PIN_Pin, GPIO_PIN_RESET);
-
 	//Menunggu data konfigurasi dari Task Storage
     while(!isConfigLoaded){
         vTaskDelay(pdMS_TO_TICKS(10));
         heartbeat_Sequencer = true;
-        //status = meunggu data konfig
     }
 
 	HAL_GPIO_WritePin(STEP_X_GPIO_Port, STEP_X_Pin , GPIO_PIN_SET);
 	HAL_GPIO_WritePin(STEP_Y_GPIO_Port, STEP_Y_Pin , GPIO_PIN_SET);
 	HAL_GPIO_WritePin(STEP_Z_GPIO_Port, STEP_Z_Pin , GPIO_PIN_SET);
+
+	// Menunggu ACK HMI, jika pop up dibuat
+//	while (kode_alarm_sistem == 1){
+//
+//	}
 
     while(1) {
         if (isAborted) {
@@ -144,6 +141,16 @@ void Task_Sequencer(void *pvParameters) {
 			}
 		}
 
+        else if (isCMDWelderON){
+        	HAL_GPIO_WritePin(WELD_PIN_GPIO_Port, WELD_PIN_Pin, GPIO_PIN_SET);
+        	Delay_With_Watchdog(500, heartbeat_Sequencer);
+        	HAL_GPIO_WritePin(ENABLE_PIN_GPIO_Port, ENABLE_PIN_Pin, GPIO_PIN_SET);
+        	Delay_With_Watchdog(2000, heartbeat_Sequencer);
+        	HAL_GPIO_WritePin(WELD_PIN_GPIO_Port, WELD_PIN_Pin, GPIO_PIN_RESET);
+        	isCMDWelderON = false;
+        	isWelderON = true;
+        }
+
 
         else {
             // =========================================================
@@ -171,6 +178,8 @@ bool Wait_Motors_Reach_Target(bool includeZ = false) {
 }
 
 void Handle_Emergency_Abort(void) {
+	uint32_t startTime;
+
 	Set_Mesin_Error(403);
 
 	isNavigating = false;
@@ -186,14 +195,27 @@ void Handle_Emergency_Abort(void) {
     isAborted = false;
     isMachineHomed = false;
 
-    Silinder_Up();
-
     //WELD OFF ALL PIN
     HAL_GPIO_WritePin(WELD_PIN_GPIO_Port, WELD_PIN_Pin, GPIO_PIN_RESET);
 
     motorX.stop();
     motorY.stop();
     motorZ.stop();
+
+    startTime = HAL_GetTick();
+
+    Silinder_Up();
+    while (HAL_GPIO_ReadPin(REED_TOP_GPIO_Port, REED_TOP_Pin) != REED_TOP_ON) {
+
+	   vTaskDelay(pdMS_TO_TICKS(1));
+
+	   if ((HAL_GetTick() - startTime) > eepromSettings.time_out_pneumatic_ms) {
+		   Set_Mesin_Error(301);
+	   }
+
+	   heartbeat_Sequencer = true;
+    }
+    Silinder_Hold();
 }
 
 bool Homing_Silinder_Z(void) {
@@ -430,6 +452,10 @@ void Perform_Manual_Jog(void) {
 }
 
 bool Eksekusi_Las(void) {
+	if (!isWelderON){
+		Set_Mesin_Error(304);
+	}
+
 	errorCode = 300;
 	uint32_t startTime;
 
