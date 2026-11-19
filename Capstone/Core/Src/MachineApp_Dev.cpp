@@ -211,6 +211,7 @@ void Handle_Emergency_Abort(void) {
 
 	   if ((HAL_GetTick() - startTime) > eepromSettings.time_out_pneumatic_ms) {
 		   Set_Mesin_Error(301);
+		   break;
 	   }
 
 	   heartbeat_Sequencer = true;
@@ -454,6 +455,7 @@ void Perform_Manual_Jog(void) {
 bool Eksekusi_Las(void) {
 	if (!isWelderON){
 		Set_Mesin_Error(304);
+		return false;
 	}
 
 	errorCode = 300;
